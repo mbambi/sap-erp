@@ -32,8 +32,8 @@ router.get("/scan", async (req: Request, res: Response, next: NextFunction) => {
           severity: "critical",
           category: "inventory",
           title: `Negative stock: ${m.materialNumber}`,
-          description: `${m.description} has negative stock of ${m.stockQuantity} ${m.unitOfMeasure}. This indicates goods were issued without sufficient receipt.`,
-          action: `Create emergency purchase order for ${Math.abs(m.stockQuantity) + (m.safetyStock || 0)} ${m.unitOfMeasure} of ${m.materialNumber}`,
+          description: `${m.description} has negative stock of ${m.stockQuantity} ${m.baseUnit}. This indicates goods were issued without sufficient receipt.`,
+          action: `Create emergency purchase order for ${Math.abs(m.stockQuantity) + (m.safetyStock || 0)} ${m.baseUnit} of ${m.materialNumber}`,
           impact: "Resolve negative inventory and prevent production stoppages",
           data: { materialId: m.id, materialNumber: m.materialNumber, currentStock: m.stockQuantity, safetyStock: m.safetyStock },
         });
@@ -44,8 +44,8 @@ router.get("/scan", async (req: Request, res: Response, next: NextFunction) => {
           severity: m.stockQuantity <= m.safetyStock * 0.5 ? "critical" : "warning",
           category: "inventory",
           title: `Low stock: ${m.materialNumber}`,
-          description: `${m.description} is at ${m.stockQuantity} ${m.unitOfMeasure} (safety stock: ${m.safetyStock}). At risk of stockout.`,
-          action: `Create purchase order for ${orderQty} ${m.unitOfMeasure} of ${m.materialNumber}`,
+          description: `${m.description} is at ${m.stockQuantity} ${m.baseUnit} (safety stock: ${m.safetyStock}). At risk of stockout.`,
+          action: `Create purchase order for ${orderQty} ${m.baseUnit} of ${m.materialNumber}`,
           impact: `Restore inventory to safe level, prevent ${m.stockQuantity <= 0 ? "immediate" : "potential"} stockout`,
           data: { materialId: m.id, materialNumber: m.materialNumber, currentStock: m.stockQuantity, safetyStock: m.safetyStock, suggestedQty: orderQty },
         });
@@ -64,7 +64,7 @@ router.get("/scan", async (req: Request, res: Response, next: NextFunction) => {
     }
     for (const s of schedules) {
       if (wcLoad[s.workCenterId]) {
-        wcLoad[s.workCenterId].load += s.quantity;
+        wcLoad[s.workCenterId].load += 1;
         wcLoad[s.workCenterId].scheduleCount++;
       }
     }
@@ -131,11 +131,11 @@ router.get("/scan", async (req: Request, res: Response, next: NextFunction) => {
         id: `rec-${++recId}`,
         severity: daysLate > 5 ? "critical" : "warning",
         category: "sales",
-        title: `Late sales order: ${so.orderNumber}`,
-        description: `SO ${so.orderNumber} for ${so.customer?.name ?? "customer"} is ${daysLate} days past requested date.`,
-        action: `Expedite fulfillment. Check inventory for ${so.orderNumber} items, create delivery if stock available, or schedule production.`,
+        title: `Late sales order: ${so.soNumber}`,
+        description: `SO ${so.soNumber} for ${so.customer?.name ?? "customer"} is ${daysLate} days past requested date.`,
+        action: `Expedite fulfillment. Check inventory for ${so.soNumber} items, create delivery if stock available, or schedule production.`,
         impact: "Improve customer satisfaction and prevent order cancellation",
-        data: { salesOrderId: so.id, orderNumber: so.orderNumber, customerName: so.customer?.name, daysLate },
+        data: { salesOrderId: so.id, orderNumber: so.soNumber, customerName: so.customer?.name, daysLate },
       });
     }
 
@@ -154,7 +154,7 @@ router.get("/scan", async (req: Request, res: Response, next: NextFunction) => {
         description: `There are ${pendingTasks.length} workflow tasks awaiting approval. Oldest: ${pendingTasks[0] ? new Date(pendingTasks[0].createdAt).toLocaleDateString() : "N/A"}.`,
         action: "Review and process pending approvals to prevent process delays",
         impact: "Unblock dependent processes (purchase orders, production releases, etc.)",
-        data: { count: pendingTasks.length, tasks: pendingTasks.slice(0, 5).map((t) => ({ id: t.id, name: t.name, workflow: t.instance.definition.name })) },
+        data: { count: pendingTasks.length, tasks: pendingTasks.slice(0, 5).map((t) => ({ id: t.id, stepNumber: t.stepNumber, action: t.action, workflow: t.instance.definition.name })) },
       });
     }
 

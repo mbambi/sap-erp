@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -1083,6 +1083,7 @@ model WorkflowDefinition {
   description String?
   module      String // finance, materials, sales, hr, etc.
   triggerEvent String // e.g. "po_created", "journal_posted"
+  conditions  String? // JSON array of rule conditions
   steps       String // JSON array of step definitions
   isActive    Boolean @default(true)
   createdAt   DateTime @default(now())

@@ -77,35 +77,24 @@ export async function runMrpEngine(config: MrpConfig) {
         materialId: material.id,
         bom: {
           tenantId,
-          material: {
-            productionOrders: {
-              some: {
-                tenantId,
-                status: { in: ["planned", "released", "in_progress"] },
-              },
-            },
-          },
         },
       },
       include: {
-        bom: {
-          include: {
-            material: {
-              include: {
-                productionOrders: {
-                  where: { tenantId, status: { in: ["planned", "released", "in_progress"] } },
-                  select: { quantity: true, yieldQty: true },
-                },
-              },
-            },
-          },
-        },
+        bom: true,
       },
     });
 
     let dependentDemand = 0;
     for (const comp of bomDemandItems) {
-      for (const po of comp.bom.material.productionOrders) {
+      const linkedProductionOrders = await prisma.productionOrder.findMany({
+        where: {
+          tenantId,
+          materialId: comp.bom.materialId,
+          status: { in: ["planned", "released", "in_progress"] },
+        },
+        select: { quantity: true, yieldQty: true },
+      });
+      for (const po of linkedProductionOrders) {
         const outstanding = po.quantity - po.yieldQty;
         if (outstanding > 0) {
           dependentDemand += outstanding * comp.quantity;

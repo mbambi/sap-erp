@@ -63,7 +63,6 @@ async function buildContext(query: string, tenantId: string) {
       where: { tenantId },
       orderBy: { createdAt: "desc" },
       take: 10,
-      include: { material: true },
     });
     context.plannedOrders = plannedOrders;
 
@@ -76,7 +75,7 @@ async function buildContext(query: string, tenantId: string) {
 
     const forecasts = await prisma.demandForecast.findMany({
       where: { tenantId },
-      orderBy: { period: "desc" },
+      orderBy: { periodStart: "desc" },
       take: 10,
     });
     context.forecasts = forecasts;

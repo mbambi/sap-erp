@@ -182,7 +182,6 @@ router.post("/rules", authenticate, requireRoles("admin", "instructor"), async (
 router.post("/rules/evaluate", authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const tenantId = req.user!.tenantId;
-    const userId = req.user!.userId;
     const { triggerEvent, document } = req.body;
 
     if (!triggerEvent || !document) {
@@ -235,12 +234,10 @@ router.post("/rules/evaluate", authenticate, async (req: Request, res: Response,
       const instance = await prisma.workflowInstance.create({
         data: {
           definitionId: def.id,
-          triggeredBy: userId,
-          documentId: document.id ?? null,
-          documentType: triggerEvent,
+          referenceId: document.id ?? `${triggerEvent}-${Date.now()}`,
           status: "active",
           currentStep: 0,
-          contextData: JSON.stringify(document),
+          context: JSON.stringify({ triggerEvent, document }),
         },
       });
 

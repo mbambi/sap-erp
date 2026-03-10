@@ -81,7 +81,7 @@ router.post("/query", async (req: Request, res: Response, next: NextFunction) =>
 
     // Use parameterized tenant filtering to prevent SQL injection
     // The user's query is wrapped, but tenantId is parameterized
-    const wrappedSql = `SELECT * FROM (${trimmed}) AS _q WHERE _q.tenantId = ?`;
+    const wrappedSql = `SELECT * FROM (${trimmed}) AS _q WHERE _q."tenantId" = $1`;
 
     const start = Date.now();
     let rows: unknown;
@@ -114,8 +114,8 @@ router.post("/query", async (req: Request, res: Response, next: NextFunction) =>
 router.get("/tables", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const tables = await prisma.$queryRaw<Array<{ name: string }>>`
-      SELECT TABLE_NAME as name FROM INFORMATION_SCHEMA.TABLES 
-      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = 'BASE TABLE' 
+      SELECT TABLE_NAME as name FROM INFORMATION_SCHEMA.TABLES
+      WHERE TABLE_SCHEMA = CURRENT_SCHEMA() AND TABLE_TYPE = 'BASE TABLE'
       ORDER BY TABLE_NAME
     `;
     const allowedTables = tables.filter((t) => ALLOWED_TABLES.has(t.name));
@@ -123,7 +123,7 @@ router.get("/tables", async (req: Request, res: Response, next: NextFunction) =>
     for (const t of allowedTables) {
       if (!validateTableName(t.name)) continue;
       const cols = await prisma.$queryRaw<Array<{ name: string; type: string }>>(
-        Prisma.sql`SELECT COLUMN_NAME as name, DATA_TYPE as type FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ${t.name} ORDER BY ORDINAL_POSITION`
+        Prisma.sql`SELECT COLUMN_NAME as name, DATA_TYPE as type FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = CURRENT_SCHEMA() AND TABLE_NAME = ${t.name} ORDER BY ORDINAL_POSITION`
       );
       result.push({ name: t.name, columns: cols.map((c) => ({ name: c.name, type: c.type })) });
     }
@@ -141,8 +141,9 @@ router.get("/sample/:table", async (req: Request, res: Response, next: NextFunct
     if (!ALLOWED_TABLES.has(table)) throw new AppError(403, "Table not allowed");
     const tenantId = req.user!.tenantId;
     // Use allowlisted table name (already validated) with parameterized tenantId
+    const safeTable = table.replace(/"/g, "");
     const rows = await prisma.$queryRawUnsafe(
-      `SELECT * FROM \`${table}\` WHERE tenantId = ? LIMIT 20`, tenantId
+      `SELECT * FROM "${safeTable}" WHERE "tenantId" = $1 LIMIT 20`, tenantId
     );
     res.json(Array.isArray(rows) ? rows : [rows]);
   } catch (err) {
@@ -158,15 +159,15 @@ router.get("/sample/:table", async (req: Request, res: Response, next: NextFunct
 router.get("/schema", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const schema = await prisma.$queryRaw<Array<{ name: string; create_stmt: string }>>`
-      SELECT TABLE_NAME as name, '' as create_stmt FROM INFORMATION_SCHEMA.TABLES 
-      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = 'BASE TABLE' 
+      SELECT TABLE_NAME as name, '' as create_stmt FROM INFORMATION_SCHEMA.TABLES
+      WHERE TABLE_SCHEMA = CURRENT_SCHEMA() AND TABLE_TYPE = 'BASE TABLE'
       ORDER BY TABLE_NAME
     `;
-    // For MySQL, build schema info from INFORMATION_SCHEMA
+    // Build schema info from INFORMATION_SCHEMA
     const schemaLines: string[] = [];
     for (const s of schema.filter((s) => ALLOWED_TABLES.has(s.name))) {
       const cols = await prisma.$queryRaw<Array<{ name: string; type: string; nullable: string }>>(
-        Prisma.sql`SELECT COLUMN_NAME as name, COLUMN_TYPE as type, IS_NULLABLE as nullable FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ${s.name} ORDER BY ORDINAL_POSITION`
+        Prisma.sql`SELECT COLUMN_NAME as name, UDT_NAME as type, IS_NULLABLE as nullable FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = CURRENT_SCHEMA() AND TABLE_NAME = ${s.name} ORDER BY ORDINAL_POSITION`
       );
       const colDefs = cols.map(c => `  ${c.name} ${c.type}${c.nullable === 'NO' ? ' NOT NULL' : ''}`).join(',\n');
       schemaLines.push(`CREATE TABLE ${s.name} (\n${colDefs}\n);`);

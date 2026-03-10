@@ -1,21 +1,19 @@
 version: "3.8"
 
 services:
-  mysql:
-    image: mysql:8.0
+  postgres:
+    image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: sap_root_password
-      MYSQL_USER: sap_user
-      MYSQL_PASSWORD: sap_password
-      MYSQL_DATABASE: sap_erp
+      POSTGRES_USER: sap_user
+      POSTGRES_PASSWORD: sap_password
+      POSTGRES_DB: sap_erp
     ports:
-      - "3306:3306"
+      - "5432:5432"
     volumes:
-      - mysql_data:/var/lib/mysql
-    command: --default-authentication-plugin=mysql_native_password
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-psap_root_password"]
+      test: ["CMD-SHELL", "pg_isready -U sap_user -d sap_erp"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -28,13 +26,13 @@ services:
     ports:
       - "3001:3001"
     environment:
-      DATABASE_URL: mysql://sap_user:sap_password@mysql:3306/sap_erp
+      DATABASE_URL: postgresql://sap_user:sap_password@postgres:5432/sap_erp?schema=public
       JWT_SECRET: ${JWT_SECRET:-change-this-in-production}
       NODE_ENV: production
       PORT: 3001
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
     depends_on:
-      mysql:
+      postgres:
         condition: service_healthy
 
   # Development-only service
@@ -47,16 +45,16 @@ services:
       - "3001:3001"
       - "5173:5173"
     environment:
-      DATABASE_URL: mysql://sap_user:sap_password@mysql:3306/sap_erp
+      DATABASE_URL: postgresql://sap_user:sap_password@postgres:5432/sap_erp?schema=public
       JWT_SECRET: dev-secret-change-me
       NODE_ENV: development
       CORS_ORIGIN: http://localhost:5173
     depends_on:
-      mysql:
+      postgres:
         condition: service_healthy
     volumes:
       - ./server/src:/app/server/src
       - ./client/src:/app/client/src
 
 volumes:
-  mysql_data:
+  postgres_data:

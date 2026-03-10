@@ -2377,7 +2377,7 @@ async function main() {
     { tenantId: tenant.id, userId: adminUser.id, userName: "Admin User", currentPage: "/admin", role: "admin", isOnline: true },
     { tenantId: tenant.id, userId: instructorUser.id, userName: "Instructor User", currentPage: "/instructor", role: "instructor", isOnline: true },
     { tenantId: tenant.id, userId: studentUser.id, userName: "Student User", currentPage: "/process-flows", role: "student", isOnline: true },
-  ]});
+  ], skipDuplicates: true });
 
   console.log("  Advanced features seed data created successfully!");
 

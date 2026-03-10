@@ -14,7 +14,7 @@ router.get("/conditions", async (req: Request, res: Response, next: NextFunction
     const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
     const take = parseInt(limit as string);
 
-    const where: { tenantId: string; conditionType?: string; materialId?: string; customerId?: string } = {
+    const where: { tenantId: string; isActive: boolean; conditionType?: string; materialId?: string; customerId?: string } = {
       tenantId: tid,
       isActive: true,
     };
