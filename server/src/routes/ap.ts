@@ -162,6 +162,25 @@ router.post("/supplier-invoices", async (req: Request, res: Response, next: Next
     const tid = req.user!.tenantId;
     const { invoiceNumber, vendorId, poId, grId, invoiceDate, dueDate, grossAmount, taxAmount, netAmount, currency, notes } = req.body;
 
+    // Validate required fields
+    if (!vendorId) throw new AppError(400, "vendorId is required");
+
+    // Validate vendor exists
+    const vendor = await prisma.vendor.findFirst({ where: { id: vendorId, tenantId: tid } });
+    if (!vendor) throw new AppError(400, "Vendor not found");
+
+    // Validate PO exists if provided
+    if (poId) {
+      const po = await prisma.purchaseOrder.findFirst({ where: { id: poId, tenantId: tid } });
+      if (!po) throw new AppError(400, "Purchase order not found");
+    }
+
+    // Validate GR exists if provided
+    if (grId) {
+      const gr = await prisma.goodsReceipt.findFirst({ where: { id: grId } });
+      if (!gr) throw new AppError(400, "Goods receipt not found");
+    }
+
     const inv = await prisma.supplierInvoice.create({
       data: {
         tenantId: tid,

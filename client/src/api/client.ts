@@ -1,4 +1,4 @@
-const BASE_URL = "/api";
+const BASE_URL = "https://sap-erp.onrender.com/api";
 
 interface FetchOptions extends RequestInit {
   params?: Record<string, string | number | undefined>;

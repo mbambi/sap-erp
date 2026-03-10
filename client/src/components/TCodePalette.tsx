@@ -11,6 +11,80 @@ interface TCode {
   description?: string;
 }
 
+const LOCAL_TCODES: TCode[] = [
+  {
+    code: "ME21N",
+    name: "Create Purchase Order",
+    module: "materials",
+    path: "/materials/purchase-orders",
+    description: "Create a new purchase order",
+  },
+  {
+    code: "MIGO",
+    name: "Goods Receipt",
+    module: "materials",
+    path: "/materials/goods-receipts",
+    description: "Post goods receipt for purchase order",
+  },
+  {
+    code: "FB50",
+    name: "Post Journal Entry",
+    module: "finance",
+    path: "/finance/journal-entries",
+    description: "Post a general ledger journal entry",
+  },
+  {
+    code: "VA01",
+    name: "Create Sales Order",
+    module: "sales",
+    path: "/sales/orders",
+    description: "Create a new sales order",
+  },
+  {
+    code: "VL01N",
+    name: "Create Delivery",
+    module: "sales",
+    path: "/sales/deliveries",
+    description: "Create outbound delivery",
+  },
+  {
+    code: "VF01",
+    name: "Create Billing Document",
+    module: "sales",
+    path: "/sales/invoices",
+    description: "Create billing document from delivery",
+  },
+  {
+    code: "MD01",
+    name: "MRP Run",
+    module: "mrp",
+    path: "/mrp",
+    description: "Run material requirements planning",
+  },
+  {
+    code: "CO01",
+    name: "Create Production Order",
+    module: "production",
+    path: "/production/orders",
+    description: "Create production order",
+  },
+];
+
+const TCODE_FALLBACK_ROUTES: Record<string, string> = {
+  ME21N: "/materials/purchase-orders",
+  MIGO: "/materials/goods-receipts",
+  FB50: "/finance/journal-entries",
+  VA01: "/sales/orders",
+  VL01N: "/sales/deliveries",
+  VF01: "/sales/invoices",
+  MD01: "/mrp",
+  CO01: "/production/orders",
+  IW31: "/maintenance/work-orders",
+  QA01: "/quality/inspections",
+  XD01: "/finance/customers",
+  XK01: "/finance/vendors",
+};
+
 export default function TCodePalette() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -25,15 +99,22 @@ export default function TCodePalette() {
     staleTime: 5 * 60 * 1000,
   });
 
+  const mergedTcodes = (() => {
+    const map = new Map<string, TCode>();
+    for (const t of LOCAL_TCODES) map.set(t.code.toUpperCase(), t);
+    for (const t of tcodes) map.set(t.code.toUpperCase(), t);
+    return Array.from(map.values());
+  })();
+
   const filtered = query.trim()
-    ? tcodes.filter(
+    ? mergedTcodes.filter(
         (t) =>
           t.code.toLowerCase().includes(query.toLowerCase()) ||
           t.name.toLowerCase().includes(query.toLowerCase()) ||
           (t.description || "").toLowerCase().includes(query.toLowerCase()) ||
           t.module.toLowerCase().includes(query.toLowerCase())
       )
-    : tcodes;
+    : mergedTcodes;
 
   const openPalette = useCallback(() => {
     setOpen(true);
@@ -46,6 +127,27 @@ export default function TCodePalette() {
     setOpen(false);
     setQuery("");
   }, []);
+
+  const navigateByQuery = useCallback(() => {
+    const normalizedQuery = query.trim().toUpperCase();
+    if (!normalizedQuery) return false;
+
+    const exactMatch = tcodes.find((t) => t.code.toUpperCase() === normalizedQuery);
+    if (exactMatch) {
+      navigate(exactMatch.path);
+      closePalette();
+      return true;
+    }
+
+    const fallbackPath = TCODE_FALLBACK_ROUTES[normalizedQuery];
+    if (fallbackPath) {
+      navigate(fallbackPath);
+      closePalette();
+      return true;
+    }
+
+    return false;
+  }, [query, tcodes, navigate, closePalette]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -81,12 +183,15 @@ export default function TCodePalette() {
           e.preventDefault();
           navigate(filtered[selectedIdx].path);
           closePalette();
+        } else if (e.key === "Enter") {
+          e.preventDefault();
+          navigateByQuery();
         }
       };
       document.addEventListener("keydown", handler);
       return () => document.removeEventListener("keydown", handler);
     }
-  }, [open, filtered, selectedIdx, navigate, closePalette]);
+  }, [open, filtered, selectedIdx, navigate, closePalette, navigateByQuery]);
 
   useEffect(() => {
     setSelectedIdx(0);

@@ -272,82 +272,106 @@ router.post(
         "Precision Components", "BestFit Industrial", "QuickShip Logistics", "TechParts Inc"];
 
       // Create plants
+      const createdPlants: { id: string }[] = [];
       for (let i = 0; i < preset.plants; i++) {
-        await prisma.plant.create({
-          data: {
-            tenantId,
-            code: `P${String(i + 1).padStart(3, "0")}`,
-            name: `Plant ${CITIES[i % CITIES.length]}`,
-            address: `${randomInt(100, 9999)} Industrial Blvd, ${CITIES[i % CITIES.length]}, ${STATES[i % STATES.length]}`,
-          },
-        }).catch(() => {});
-        counts.plants = (counts.plants || 0) + 1;
+        try {
+          const p = await prisma.plant.create({
+            data: {
+              tenantId,
+              code: `P${String(i + 1).padStart(3, "0")}`,
+              name: `Plant ${CITIES[i % CITIES.length]}`,
+              address: `${randomInt(100, 9999)} Industrial Blvd, ${CITIES[i % CITIES.length]}, ${STATES[i % STATES.length]}`,
+            },
+          });
+          createdPlants.push({ id: p.id });
+          counts.plants = (counts.plants || 0) + 1;
+        } catch (e) {
+          // Log plant creation errors but continue
+        }
       }
 
-      const plants = await prisma.plant.findMany({ where: { tenantId }, select: { id: true } });
+      const plants = createdPlants.length > 0 ? createdPlants : await prisma.plant.findMany({ where: { tenantId }, select: { id: true } });
 
-      // Create warehouses
-      for (let i = 0; i < preset.warehouses; i++) {
+      // Create warehouses (only if plants exist to satisfy foreign key)
+      for (let i = 0; i < preset.warehouses && plants.length > 0; i++) {
         const plant = pick(plants);
-        await prisma.warehouse.create({
-          data: {
-            tenantId,
-            plantId: plant?.id ?? plants[0]?.id ?? "",
-            code: `WH${String(i + 1).padStart(3, "0")}`,
-            name: `Warehouse ${String.fromCharCode(65 + i)}`,
-            type: pick(["standard", "cold", "hazmat", "staging"]),
-          },
-        }).catch(() => {});
-        counts.warehouses = (counts.warehouses || 0) + 1;
+        if (plant?.id) {
+          try {
+            await prisma.warehouse.create({
+              data: {
+                tenantId,
+                plantId: plant.id,
+                code: `WH${String(i + 1).padStart(3, "0")}`,
+                name: `Warehouse ${String.fromCharCode(65 + i)}`,
+                type: pick(["standard", "cold", "hazmat", "staging"]),
+              },
+            });
+            counts.warehouses = (counts.warehouses || 0) + 1;
+          } catch (e) {
+            // Log warehouse creation errors but continue
+          }
+        }
       }
 
       // Create cost centers
       for (let i = 0; i < preset.costCenters; i++) {
-        await prisma.costCenter.create({
-          data: {
-            tenantId,
-            code: `CC${String(i + 1).padStart(4, "0")}`,
-            name: `${DEPARTMENTS[i % DEPARTMENTS.length]} Cost Center`,
-            category: pick(["production", "admin", "sales", "research"]),
-          },
-        }).catch(() => {});
-        counts.costCenters = (counts.costCenters || 0) + 1;
+        try {
+          await prisma.costCenter.create({
+            data: {
+              tenantId,
+              code: `CC${String(i + 1).padStart(4, "0")}`,
+              name: `${DEPARTMENTS[i % DEPARTMENTS.length]} Cost Center`,
+              category: pick(["production", "admin", "sales", "research"]),
+            },
+          });
+          counts.costCenters = (counts.costCenters || 0) + 1;
+        } catch (e) {
+          // Log cost center creation errors but continue
+        }
       }
 
       // Create customers with realistic data
       for (let i = 0; i < preset.customers; i++) {
-        await prisma.customer.create({
-          data: {
-            tenantId,
-            customerNumber: `C-${String(i + 1).padStart(5, "0")}`,
-            name: `${pick(FIRST_NAMES)} ${pick(LAST_NAMES)} ${pick(["Industries", "Corp", "LLC", "Group", "Enterprises"])}`,
-            city: pick(CITIES),
-            state: pick(STATES),
-            country: "US",
-            email: `customer${i + 1}@example.com`,
-            phone: `+1-${randomInt(200, 999)}-${randomInt(100, 999)}-${randomInt(1000, 9999)}`,
-            creditLimit: randomInt(5000, 100000),
-            paymentTerms: pick(PAYMENT_TERMS),
-          },
-        }).catch(() => {});
-        counts.customers = (counts.customers || 0) + 1;
+        try {
+          await prisma.customer.create({
+            data: {
+              tenantId,
+              customerNumber: `C-${String(i + 1).padStart(5, "0")}`,
+              name: `${pick(FIRST_NAMES)} ${pick(LAST_NAMES)} ${pick(["Industries", "Corp", "LLC", "Group", "Enterprises"])}`,
+              city: pick(CITIES),
+              state: pick(STATES),
+              country: "US",
+              email: `customer${i + 1}@example.com`,
+              phone: `+1-${randomInt(200, 999)}-${randomInt(100, 999)}-${randomInt(1000, 9999)}`,
+              creditLimit: randomInt(5000, 100000),
+              paymentTerms: pick(PAYMENT_TERMS),
+            },
+          });
+          counts.customers = (counts.customers || 0) + 1;
+        } catch (e) {
+          // Log customer creation errors but continue
+        }
       }
 
       // Create vendors with realistic data
       for (let i = 0; i < preset.vendors; i++) {
-        await prisma.vendor.create({
-          data: {
-            tenantId,
-            vendorNumber: `V-${String(i + 1).padStart(5, "0")}`,
-            name: i < VENDOR_NAMES.length ? VENDOR_NAMES[i] : `${pick(FIRST_NAMES)} ${pick(LAST_NAMES)} Supply`,
-            city: pick(CITIES),
-            state: pick(STATES),
-            country: "US",
-            email: `vendor${i + 1}@supplier.com`,
-            paymentTerms: pick(PAYMENT_TERMS),
-          },
-        }).catch(() => {});
-        counts.vendors = (counts.vendors || 0) + 1;
+        try {
+          await prisma.vendor.create({
+            data: {
+              tenantId,
+              vendorNumber: `V-${String(i + 1).padStart(5, "0")}`,
+              name: i < VENDOR_NAMES.length ? VENDOR_NAMES[i] : `${pick(FIRST_NAMES)} ${pick(LAST_NAMES)} Supply`,
+              city: pick(CITIES),
+              state: pick(STATES),
+              country: "US",
+              email: `vendor${i + 1}@supplier.com`,
+              paymentTerms: pick(PAYMENT_TERMS),
+            },
+          });
+          counts.vendors = (counts.vendors || 0) + 1;
+        } catch (e) {
+          // Log vendor creation errors but continue
+        }
       }
 
       // Create materials with realistic manufacturing names
@@ -435,27 +459,34 @@ router.post(
             description: `BOM for finished product ${i + 1}`,
             components: { create: components },
           },
-        }).catch(() => {});
+        }).catch((err) => {
+          // BOM creation failed, continue
+          console.error(`[DatasetGenerator] BOM ${i + 1} creation failed:`, err);
+        });
         counts.boms = (counts.boms || 0) + 1;
       }
 
       // Create employees
       for (let i = 0; i < preset.employees; i++) {
-        await prisma.employee.create({
-          data: {
-            tenantId,
-            employeeNumber: `E-${String(i + 1).padStart(5, "0")}`,
-            firstName: pick(FIRST_NAMES),
-            lastName: pick(LAST_NAMES),
-            department: pick(DEPARTMENTS),
-            position: pick(["Engineer", "Operator", "Supervisor", "Manager", "Analyst", "Technician"]),
-            hireDate: new Date(2020 + randomInt(0, 5), randomInt(0, 11), randomInt(1, 28)),
-            status: "active",
-            plantId: plants.length > 0 ? pick(plants).id : undefined,
-            salary: randomInt(40000, 120000),
-          },
-        }).catch(() => {});
-        counts.employees = (counts.employees || 0) + 1;
+        try {
+          await prisma.employee.create({
+            data: {
+              tenantId,
+              employeeNumber: `E-${String(i + 1).padStart(5, "0")}`,
+              firstName: pick(FIRST_NAMES),
+              lastName: pick(LAST_NAMES),
+              department: pick(DEPARTMENTS),
+              position: pick(["Engineer", "Operator", "Supervisor", "Manager", "Analyst", "Technician"]),
+              hireDate: new Date(2020 + randomInt(0, 5), randomInt(0, 11), randomInt(1, 28)),
+              status: "active",
+              plantId: plants.length > 0 ? pick(plants).id : undefined,
+              salary: randomInt(40000, 120000),
+            },
+          });
+          counts.employees = (counts.employees || 0) + 1;
+        } catch (e) {
+          // Log employee creation errors but continue
+        }
       }
 
       // Create purchase orders
@@ -464,28 +495,33 @@ router.post(
         const vendor = pick(vendors);
         if (!vendor || rawMats.length === 0) continue;
         const mat = pick(rawMats);
+        if (!mat) continue;
         const qty = randomInt(10, 200);
         const price = randomInt(5, 150);
-        await prisma.purchaseOrder.create({
-          data: {
-            tenantId,
-            poNumber: `PO-${String(i + 1).padStart(7, "0")}`,
-            vendorId: vendor.id,
-            status: pick(["draft", "approved", "ordered", "received", "closed"]),
-            totalAmount: qty * price,
-            createdBy: userId,
-            items: {
-              create: [{
-                lineNumber: 1,
-                materialId: mat.id,
-                quantity: qty,
-                unitPrice: price,
-                totalPrice: qty * price,
-              }],
+        try {
+          await prisma.purchaseOrder.create({
+            data: {
+              tenantId,
+              poNumber: `PO-${String(i + 1).padStart(7, "0")}`,
+              vendorId: vendor.id,
+              status: pick(["draft", "approved", "ordered", "received", "closed"]),
+              totalAmount: qty * price,
+              createdBy: userId,
+              items: {
+                create: [{
+                  lineNumber: 1,
+                  materialId: mat.id,
+                  quantity: qty,
+                  unitPrice: price,
+                  totalPrice: qty * price,
+                }],
+              },
             },
-          },
-        }).catch(() => {});
-        counts.purchaseOrders = (counts.purchaseOrders || 0) + 1;
+          });
+          counts.purchaseOrders = (counts.purchaseOrders || 0) + 1;
+        } catch (e) {
+          // Log PO creation errors but continue
+        }
       }
 
       // Create sales orders
@@ -494,28 +530,33 @@ router.post(
         const customer = pick(customers);
         if (!customer || finishedMats.length === 0) continue;
         const mat = pick(finishedMats);
+        if (!mat) continue;
         const qty = randomInt(1, 50);
         const price = randomInt(100, 2000);
-        await prisma.salesOrder.create({
-          data: {
-            tenantId,
-            soNumber: `SO-${String(i + 1).padStart(7, "0")}`,
-            customerId: customer.id,
-            status: pick(["draft", "confirmed", "processing", "completed"]),
-            totalAmount: qty * price,
-            createdBy: userId,
-            items: {
-              create: [{
-                lineNumber: 1,
-                materialId: mat.id,
-                quantity: qty,
-                unitPrice: price,
-                totalPrice: qty * price,
-              }],
+        try {
+          await prisma.salesOrder.create({
+            data: {
+              tenantId,
+              soNumber: `SO-${String(i + 1).padStart(7, "0")}`,
+              customerId: customer.id,
+              status: pick(["draft", "confirmed", "processing", "completed"]),
+              totalAmount: qty * price,
+              createdBy: userId,
+              items: {
+                create: [{
+                  lineNumber: 1,
+                  materialId: mat.id,
+                  quantity: qty,
+                  unitPrice: price,
+                  totalPrice: qty * price,
+                }],
+              },
             },
-          },
-        }).catch(() => {});
-        counts.salesOrders = (counts.salesOrders || 0) + 1;
+          });
+          counts.salesOrders = (counts.salesOrders || 0) + 1;
+        } catch (e) {
+          // Log SO creation errors but continue
+        }
       }
 
       res.json({ size, counts });

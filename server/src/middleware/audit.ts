@@ -43,7 +43,10 @@ export function auditLog(module: string, resource: string) {
               : null,
             ipAddress: req.ip || req.headers["x-forwarded-for"] as string || "unknown",
           },
-        }).catch(() => {});
+        }).catch((err) => {
+          // Audit log creation failed, but continue processing
+          console.error("[AuditLog] Failed to create audit log:", err);
+        });
       }
       return originalJson(body);
     };

@@ -139,7 +139,10 @@ router.post("/reset", async (req: Request, res: Response, next: NextFunction) =>
     await prisma.studentCompany.update({
       where: { tenantId_userId: { tenantId, userId } },
       data: { cashBalance: 100000, revenue: 0, expenses: 0, profit: 0, inventoryValue: 0, serviceLevel: 100 },
-    }).catch(() => {});
+    }).catch((err) => {
+      // Student company may not exist yet, continue anyway
+      console.error("[StudentSandbox] Failed to reset company financials:", err);
+    });
 
     await prisma.notification.create({
       data: {

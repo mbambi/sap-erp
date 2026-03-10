@@ -418,14 +418,16 @@ function runSafetyStockAnalysis(params: Record<string, unknown>): Record<string,
 
   return {
     analysis: results,
-    recommendation: results.find((r) => r.serviceLevel === 95) ?? results[Math.floor(results.length / 2)],
-    marginalAnalysis: results.slice(1).map((r, i) => ({
+    recommendation: results.length > 0 
+      ? (results.find((r) => r.serviceLevel === 95) ?? results[Math.floor(results.length / 2)])
+      : undefined,
+    marginalAnalysis: results.length > 1 ? results.slice(1).map((r, i) => ({
       from: results[i].serviceLevel,
       to: r.serviceLevel,
       additionalSafetyStock: r.safetyStock - results[i].safetyStock,
       additionalCost: Math.round((r.holdingCostPerYear - results[i].holdingCostPerYear) * 100) / 100,
       stockoutsAvoided: Math.round((results[i].expectedStockoutsPerYear - r.expectedStockoutsPerYear) * 100) / 100,
-    })),
+    })) : [],
   };
 }
 
@@ -496,7 +498,7 @@ function runBullwhipSimulation(params: Record<string, number>): Record<string, u
     stageStats,
     varianceRatios,
     bullwhipRatio: stageStats.length > 1
-      ? Math.round((stageStats[stageStats.length - 1].variance / stageStats[0].variance) * 100) / 100
+      ? Math.round((stageStats[stageStats.length - 1].variance / (stageStats[0].variance || 1)) * 100) / 100
       : 1,
   };
 }
