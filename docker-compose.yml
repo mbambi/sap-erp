@@ -1,0 +1,62 @@
+version: "3.8"
+
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: sap_root_password
+      MYSQL_USER: sap_user
+      MYSQL_PASSWORD: sap_password
+      MYSQL_DATABASE: sap_erp
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    command: --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-psap_root_password"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      DATABASE_URL: mysql://sap_user:sap_password@mysql:3306/sap_erp
+      JWT_SECRET: ${JWT_SECRET:-change-this-in-production}
+      NODE_ENV: production
+      PORT: 3001
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  # Development-only service
+  dev:
+    profiles: ["dev"]
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3001:3001"
+      - "5173:5173"
+    environment:
+      DATABASE_URL: mysql://sap_user:sap_password@mysql:3306/sap_erp
+      JWT_SECRET: dev-secret-change-me
+      NODE_ENV: development
+      CORS_ORIGIN: http://localhost:5173
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - ./server/src:/app/server/src
+      - ./client/src:/app/client/src
+
+volumes:
+  mysql_data:

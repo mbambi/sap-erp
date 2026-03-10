@@ -1,0 +1,2212 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Notifications ────────────────────────────────────────────────────
+
+model Notification {
+  id          String   @id @default(uuid())
+  tenantId    String
+  userId      String
+  type        String   // info, warning, success, error, achievement, system
+  title       String
+  message     String
+  module      String?
+  link        String?
+  isRead      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, userId, isRead])
+}
+
+// ─── User Profile Extensions ──────────────────────────────────────────
+
+model UserProfile {
+  id          String  @id @default(uuid())
+  userId      String  @unique
+  tenantId    String
+  avatar      String?
+  bio         String?
+  department  String?
+  title       String?
+  phone       String?
+  timezone    String  @default("UTC")
+  language    String  @default("en")
+  theme       String  @default("light")
+  emailNotifications Boolean @default(true)
+  dashboardLayout    String? // JSON
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+}
+
+// ─── Student Sandbox Companies ────────────────────────────────────────
+
+model StudentCompany {
+  id          String   @id @default(uuid())
+  tenantId    String
+  userId      String
+  companyName String
+  industry    String   @default("manufacturing")
+  description String?
+  cashBalance Float    @default(100000)
+  revenue     Float    @default(0)
+  expenses    Float    @default(0)
+  profit      Float    @default(0)
+  inventoryValue Float @default(0)
+  serviceLevel Float   @default(100)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, userId])
+}
+
+// ─── Supply Chain Game Mode ───────────────────────────────────────────
+
+model GameSession {
+  id          String   @id @default(uuid())
+  tenantId    String
+  name        String
+  description String?
+  status      String   @default("lobby") // lobby, active, completed
+  startDate   DateTime?
+  endDate     DateTime?
+  duration    Int      @default(30) // game days
+  currentDay  Int      @default(0)
+  settings    String   // JSON: difficulty, events enabled, etc.
+  createdBy   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant  Tenant       @relation(fields: [tenantId], references: [id])
+  players GamePlayer[]
+}
+
+model GamePlayer {
+  id              String   @id @default(uuid())
+  gameSessionId   String
+  userId          String
+  companyName     String
+  revenue         Float    @default(0)
+  totalCost       Float    @default(0)
+  profit          Float    @default(0)
+  inventoryTurnover Float  @default(0)
+  serviceLevel    Float    @default(100)
+  cashFlow        Float    @default(0)
+  onTimeDelivery  Float    @default(100)
+  qualityScore    Float    @default(100)
+  overallScore    Float    @default(0)
+  rank            Int      @default(0)
+  decisions       String?  // JSON: array of decisions made
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  gameSession GameSession @relation(fields: [gameSessionId], references: [id], onDelete: Cascade)
+
+  @@unique([gameSessionId, userId])
+}
+
+// ─── Job Queue Tracking ───────────────────────────────────────────────
+
+model BackgroundJob {
+  id          String   @id @default(uuid())
+  tenantId    String
+  type        String   // mrp_run, simulation, dataset_generation, report_generation
+  status      String   @default("queued") // queued, processing, completed, failed
+  payload     String   // JSON input
+  result      String?  // JSON output
+  error       String?
+  progress    Int      @default(0)
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdBy   String
+  createdAt   DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, status])
+}
+
+// ─── Multi-Tenancy & Auth ────────────────────────────────────────────
+
+model Tenant {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique
+  university  String?
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users             User[]
+  roles             Role[]
+  companyCode       CompanyCode[]
+  plants            Plant[]
+  glAccounts        GLAccount[]
+  journals          JournalEntry[]
+  vendors           Vendor[]
+  customers         Customer[]
+  purchaseOrders    PurchaseOrder[]
+  salesOrders       SalesOrder[]
+  materials         Material[]
+  boms              BillOfMaterial[]
+  productionOrders  ProductionOrder[]
+  warehouses        Warehouse[]
+  equipment         Equipment[]
+  workOrders        WorkOrder[]
+  employees         Employee[]
+  costCenters       CostCenter[]
+  internalOrders    InternalOrder[]
+  workflows         WorkflowDefinition[]
+  exercises         Exercise[]
+  scenarios         Scenario[]
+  auditLogs         AuditLog[]
+  inspectionLots    InspectionLot[]
+  nonConformances   NonConformance[]
+  reports           SavedReport[]
+  mrpRuns           MrpRun[]
+  demandForecasts   DemandForecast[]
+  plannedOrders     PlannedOrder[]
+  workCenters       WorkCenter[]
+  productionSchedules ProductionSchedule[]
+  supplyChainNodes  SupplyChainNode[]
+  supplyChainLinks  SupplyChainLink[]
+  processEvents     ProcessEvent[]
+  inventoryPolicies InventoryPolicy[]
+  userXP            UserXP[]
+  operationsMetrics OperationsMetric[]
+  fiscalPeriods     FiscalPeriod[]
+  purchaseRequisitions PurchaseRequisition[]
+  supplierInvoices  SupplierInvoice[]
+  payments          Payment[]
+  pricingConditions PricingCondition[]
+  shipments         Shipment[]
+  assets            Asset[]
+  costEstimates     CostEstimate[]
+  erpEvents         ERPEvent[]
+  simulationSessions SimulationSession[]
+  instructorActions InstructorAction[]
+  companies         Company[]
+  intercompanyTxns  IntercompanyTransaction[]
+  transferPricingRules TransferPricingRule[]
+  financialStatements FinancialStatement[]
+  closingPeriods    ClosingPeriod[]
+  portalAccesses    PortalAccess[]
+  factSales         FactSales[]
+  factInventory     FactInventory[]
+  optimizationRuns  OptimizationRun[]
+  integrationEndpoints IntegrationEndpoint[]
+  integrationLogs   IntegrationLog[]
+  documents         Document[]
+  systemMetrics     SystemMetric[]
+  courses           Course[]
+  certifications    Certification[]
+  datasetTemplates  DatasetTemplate[]
+  processFlows      ProcessFlow[]
+  digitalTwinStates DigitalTwinState[]
+  industryTemplates IndustryTemplate[]
+  decisionImpacts   DecisionImpact[]
+  benchmarkRuns     BenchmarkRun[]
+  stressTests       StressTest[]
+  userPresences     UserPresence[]
+  notifications     Notification[]
+  userProfiles      UserProfile[]
+  studentCompanies  StudentCompany[]
+  gameSessions      GameSession[]
+  backgroundJobs    BackgroundJob[]
+}
+
+model User {
+  id             String   @id @default(uuid())
+  tenantId       String
+  email          String
+  passwordHash   String
+  firstName      String
+  lastName       String
+  isActive       Boolean  @default(true)
+  lastLogin      DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant         Tenant   @relation(fields: [tenantId], references: [id])
+  userRoles      UserRole[]
+  auditLogs      AuditLog[]
+  workflowTasks  WorkflowTask[]
+  exerciseProgress ExerciseProgress[]
+
+  @@unique([tenantId, email])
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  tenantId    String
+  name        String
+  description String?
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  tenant      Tenant     @relation(fields: [tenantId], references: [id])
+  userRoles   UserRole[]
+  permissions RolePermission[]
+
+  @@unique([tenantId, name])
+}
+
+model UserRole {
+  id     String @id @default(uuid())
+  userId String
+  roleId String
+
+  user User @relation(fields: [userId], references: [id])
+  role Role @relation(fields: [roleId], references: [id])
+
+  @@unique([userId, roleId])
+}
+
+model RolePermission {
+  id         String @id @default(uuid())
+  roleId     String
+  module     String
+  action     String // create, read, update, delete, approve, export
+  resource   String // e.g. "journal_entry", "purchase_order"
+
+  role Role @relation(fields: [roleId], references: [id])
+
+  @@unique([roleId, module, action, resource])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  tenantId   String
+  userId     String?
+  action     String
+  module     String
+  resource   String
+  resourceId String?
+  oldValue   String?  // JSON
+  newValue   String?  // JSON
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User?  @relation(fields: [userId], references: [id])
+}
+
+// ─── Finance (FI) ────────────────────────────────────────────────────
+
+model CompanyCode {
+  id          String @id @default(uuid())
+  tenantId    String
+  code        String
+  name        String
+  currency    String @default("USD")
+  country     String @default("US")
+  fiscalYear  String @default("calendar") // calendar or custom
+  createdAt   DateTime @default(now())
+
+  tenant     Tenant        @relation(fields: [tenantId], references: [id])
+  glAccounts GLAccount[]
+  journals   JournalEntry[]
+
+  @@unique([tenantId, code])
+}
+
+model GLAccount {
+  id            String  @id @default(uuid())
+  tenantId      String
+  companyCodeId String
+  accountNumber String
+  name          String
+  type          String  // asset, liability, equity, revenue, expense
+  parentId      String?
+  isActive      Boolean @default(true)
+  currency      String  @default("USD")
+  createdAt     DateTime @default(now())
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  companyCode CompanyCode @relation(fields: [companyCodeId], references: [id])
+  parent      GLAccount?  @relation("GLAccountHierarchy", fields: [parentId], references: [id])
+  children    GLAccount[] @relation("GLAccountHierarchy")
+  lineItems   JournalLineItem[]
+
+  @@unique([tenantId, companyCodeId, accountNumber])
+}
+
+model JournalEntry {
+  id            String   @id @default(uuid())
+  tenantId      String
+  companyCodeId String
+  documentNumber String
+  postingDate   DateTime
+  documentDate  DateTime
+  description   String?
+  reference     String?
+  status        String   @default("draft") // draft, posted, reversed
+  reversalOf    String?
+  createdBy     String
+  createdAt     DateTime @default(now())
+
+  tenant      Tenant            @relation(fields: [tenantId], references: [id])
+  companyCode CompanyCode       @relation(fields: [companyCodeId], references: [id])
+  lineItems   JournalLineItem[]
+
+  @@unique([tenantId, companyCodeId, documentNumber])
+}
+
+model JournalLineItem {
+  id             String  @id @default(uuid())
+  journalEntryId String
+  glAccountId    String
+  lineNumber     Int
+  debit          Float   @default(0)
+  credit         Float   @default(0)
+  description    String?
+  costCenterId   String?
+  internalOrderId String?
+  profitCenterId  String?
+
+  journalEntry JournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  glAccount    GLAccount    @relation(fields: [glAccountId], references: [id])
+}
+
+model Vendor {
+  id            String   @id @default(uuid())
+  tenantId      String
+  vendorNumber  String
+  name          String
+  street        String?
+  city          String?
+  state         String?
+  postalCode    String?
+  country       String   @default("US")
+  phone         String?
+  email         String?
+  taxId         String?
+  paymentTerms  String   @default("NET30")
+  currency      String   @default("USD")
+  bankAccount   String?
+  bankRouting   String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tenant         Tenant          @relation(fields: [tenantId], references: [id])
+  purchaseOrders PurchaseOrder[]
+
+  @@unique([tenantId, vendorNumber])
+}
+
+model Customer {
+  id              String   @id @default(uuid())
+  tenantId        String
+  customerNumber  String
+  name            String
+  street          String?
+  city            String?
+  state           String?
+  postalCode      String?
+  country         String   @default("US")
+  phone           String?
+  email           String?
+  taxId           String?
+  paymentTerms    String   @default("NET30")
+  creditLimit     Float    @default(0)
+  currency        String   @default("USD")
+  priceList       String?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id])
+  salesOrders SalesOrder[]
+  deliveries  Delivery[]
+  invoices    Invoice[]
+
+  @@unique([tenantId, customerNumber])
+}
+
+model FixedAsset {
+  id              String   @id @default(uuid())
+  assetNumber     String
+  description     String
+  acquisitionDate DateTime
+  acquisitionCost Float
+  usefulLifeYears Int
+  depreciationMethod String @default("straight-line")
+  salvageValue    Float    @default(0)
+  accumulatedDepreciation Float @default(0)
+  status          String   @default("active") // active, disposed, transferred
+  location        String?
+  costCenterId    String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model BankAccount {
+  id            String @id @default(uuid())
+  accountName   String
+  bankName      String
+  accountNumber String
+  routingNumber String?
+  iban          String?
+  swift         String?
+  currency      String @default("USD")
+  balance       Float  @default(0)
+  isActive      Boolean @default(true)
+  createdAt     DateTime @default(now())
+}
+
+// ─── Materials Management (MM) ───────────────────────────────────────
+
+model Plant {
+  id       String @id @default(uuid())
+  tenantId String
+  code     String
+  name     String
+  address  String?
+  isActive Boolean @default(true)
+
+  tenant      Tenant        @relation(fields: [tenantId], references: [id])
+  warehouses  Warehouse[]
+  equipment   Equipment[]
+  employees   Employee[]
+
+  @@unique([tenantId, code])
+}
+
+model Material {
+  id              String   @id @default(uuid())
+  tenantId        String
+  materialNumber  String
+  description     String
+  type            String   // raw, semi-finished, finished, trading, service
+  baseUnit        String   @default("EA")
+  materialGroup   String?
+  weight          Float?
+  weightUnit      String?
+  volume          Float?
+  volumeUnit      String?
+  standardPrice   Float    @default(0)
+  movingAvgPrice  Float    @default(0)
+  lotSize         Int      @default(1)
+  safetyStock     Int      @default(0)
+  reorderPoint    Int      @default(0)
+  leadTimeDays    Int      @default(0)
+  stockQuantity   Int      @default(0)
+  reservedQty     Int      @default(0)
+  valuationClass  String?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant           Tenant              @relation(fields: [tenantId], references: [id])
+  poItems          PurchaseOrderItem[]
+  soItems          SalesOrderItem[]
+  bomParent        BillOfMaterial[]    @relation("BOMParent")
+  bomComponents    BOMComponent[]
+  inventoryMovements InventoryMovement[]
+  warehouseBins    WarehouseBin[]
+  inspectionLots   InspectionLot[]
+
+  @@unique([tenantId, materialNumber])
+}
+
+model PurchaseOrder {
+  id              String   @id @default(uuid())
+  tenantId        String
+  poNumber        String
+  vendorId        String
+  orderDate       DateTime @default(now())
+  deliveryDate    DateTime?
+  status          String   @default("draft") // draft, approved, ordered, received, closed, cancelled
+  totalAmount     Float    @default(0)
+  currency        String   @default("USD")
+  paymentTerms    String   @default("NET30")
+  notes           String?
+  approvedBy      String?
+  approvedAt      DateTime?
+  createdBy       String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant Tenant              @relation(fields: [tenantId], references: [id])
+  vendor Vendor              @relation(fields: [vendorId], references: [id])
+  items  PurchaseOrderItem[]
+  goodsReceipts GoodsReceipt[]
+
+  @@unique([tenantId, poNumber])
+}
+
+model PurchaseOrderItem {
+  id          String @id @default(uuid())
+  poId        String
+  lineNumber  Int
+  materialId  String
+  quantity    Int
+  unit        String @default("EA")
+  unitPrice   Float
+  totalPrice  Float
+  deliveryDate DateTime?
+  receivedQty Int    @default(0)
+
+  purchaseOrder PurchaseOrder @relation(fields: [poId], references: [id], onDelete: Cascade)
+  material      Material      @relation(fields: [materialId], references: [id])
+}
+
+model GoodsReceipt {
+  id        String   @id @default(uuid())
+  poId      String
+  grNumber  String
+  receiptDate DateTime @default(now())
+  notes     String?
+  createdBy String
+  createdAt DateTime @default(now())
+
+  purchaseOrder PurchaseOrder @relation(fields: [poId], references: [id])
+  items         GoodsReceiptItem[]
+}
+
+model GoodsReceiptItem {
+  id            String @id @default(uuid())
+  goodsReceiptId String
+  materialId    String
+  quantity      Int
+  batchNumber   String?
+  storageLocation String?
+
+  goodsReceipt GoodsReceipt @relation(fields: [goodsReceiptId], references: [id], onDelete: Cascade)
+}
+
+model InventoryMovement {
+  id          String   @id @default(uuid())
+  materialId  String
+  movementType String  // receipt, issue, transfer, adjustment, scrap
+  quantity    Int
+  unit        String   @default("EA")
+  fromLocation String?
+  toLocation   String?
+  reference   String?
+  reason      String?
+  createdBy   String
+  createdAt   DateTime @default(now())
+
+  material Material @relation(fields: [materialId], references: [id])
+}
+
+// ─── Sales & Distribution (SD) ───────────────────────────────────────
+
+model SalesOrder {
+  id             String   @id @default(uuid())
+  tenantId       String
+  soNumber       String
+  customerId     String
+  orderDate      DateTime @default(now())
+  requestedDate  DateTime?
+  status         String   @default("draft") // draft, confirmed, processing, shipped, completed, cancelled
+  totalAmount    Float    @default(0)
+  currency       String   @default("USD")
+  paymentTerms   String   @default("NET30")
+  shippingMethod String?
+  notes          String?
+  createdBy      String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant    Tenant           @relation(fields: [tenantId], references: [id])
+  customer  Customer         @relation(fields: [customerId], references: [id])
+  items     SalesOrderItem[]
+  deliveries Delivery[]
+  invoices   Invoice[]
+
+  @@unique([tenantId, soNumber])
+}
+
+model SalesOrderItem {
+  id          String @id @default(uuid())
+  soId        String
+  lineNumber  Int
+  materialId  String
+  quantity    Int
+  unit        String @default("EA")
+  unitPrice   Float
+  discount    Float  @default(0)
+  totalPrice  Float
+  deliveredQty Int   @default(0)
+
+  salesOrder SalesOrder @relation(fields: [soId], references: [id], onDelete: Cascade)
+  material   Material   @relation(fields: [materialId], references: [id])
+}
+
+model Delivery {
+  id           String   @id @default(uuid())
+  deliveryNumber String
+  soId         String
+  customerId   String
+  deliveryDate DateTime @default(now())
+  status       String   @default("planned") // planned, picked, packed, shipped, delivered
+  trackingNumber String?
+  carrier      String?
+  notes        String?
+  createdBy    String
+  createdAt    DateTime @default(now())
+
+  salesOrder SalesOrder     @relation(fields: [soId], references: [id])
+  customer   Customer       @relation(fields: [customerId], references: [id])
+  items      DeliveryItem[]
+}
+
+model DeliveryItem {
+  id         String @id @default(uuid())
+  deliveryId String
+  materialId String
+  quantity   Int
+  batchNumber String?
+
+  delivery Delivery @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+}
+
+model Invoice {
+  id            String   @id @default(uuid())
+  invoiceNumber String
+  soId          String
+  customerId    String
+  invoiceDate   DateTime @default(now())
+  dueDate       DateTime
+  status        String   @default("draft") // draft, sent, paid, overdue, cancelled
+  subtotal      Float
+  taxAmount     Float    @default(0)
+  totalAmount   Float
+  paidAmount    Float    @default(0)
+  currency      String   @default("USD")
+  notes         String?
+  createdBy     String
+  createdAt     DateTime @default(now())
+
+  salesOrder SalesOrder    @relation(fields: [soId], references: [id])
+  customer   Customer      @relation(fields: [customerId], references: [id])
+  items      InvoiceItem[]
+}
+
+model InvoiceItem {
+  id         String @id @default(uuid())
+  invoiceId  String
+  description String
+  quantity   Int
+  unitPrice  Float
+  totalPrice Float
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+// ─── Production Planning (PP) ────────────────────────────────────────
+
+model BillOfMaterial {
+  id          String @id @default(uuid())
+  tenantId    String
+  bomNumber   String
+  materialId  String // finished product
+  description String?
+  version     Int    @default(1)
+  isActive    Boolean @default(true)
+  validFrom   DateTime @default(now())
+  validTo     DateTime?
+  createdAt   DateTime @default(now())
+
+  tenant     Tenant         @relation(fields: [tenantId], references: [id])
+  material   Material       @relation("BOMParent", fields: [materialId], references: [id])
+  components BOMComponent[]
+  routings   Routing[]
+
+  @@unique([tenantId, bomNumber])
+}
+
+model BOMComponent {
+  id          String @id @default(uuid())
+  bomId       String
+  materialId  String
+  quantity    Float
+  unit        String  @default("EA")
+  position    Int
+  isPhantom   Boolean @default(false)
+  scrapRate   Float   @default(0)
+
+  bom      BillOfMaterial @relation(fields: [bomId], references: [id], onDelete: Cascade)
+  material Material       @relation(fields: [materialId], references: [id])
+}
+
+model Routing {
+  id     String @id @default(uuid())
+  bomId  String
+  stepNo Int
+  workCenter String
+  operation  String
+  description String?
+  setupTime   Float @default(0) // hours
+  runTime     Float @default(0) // hours per unit
+  laborRate   Float @default(0)
+  machineRate Float @default(0)
+
+  bom BillOfMaterial @relation(fields: [bomId], references: [id], onDelete: Cascade)
+}
+
+model ProductionOrder {
+  id            String   @id @default(uuid())
+  tenantId      String
+  orderNumber   String
+  materialId    String
+  quantity      Int
+  unit          String   @default("EA")
+  plannedStart  DateTime
+  plannedEnd    DateTime
+  actualStart   DateTime?
+  actualEnd     DateTime?
+  status        String   @default("planned") // planned, released, in_progress, completed, closed
+  priority      Int      @default(5)
+  yieldQty      Int      @default(0)
+  scrapQty      Int      @default(0)
+  notes         String?
+  createdBy     String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, orderNumber])
+}
+
+// ─── Warehouse Management (WM) ──────────────────────────────────────
+
+model Warehouse {
+  id       String @id @default(uuid())
+  tenantId String
+  plantId  String
+  code     String
+  name     String
+  type     String @default("standard") // standard, cold, hazmat, staging
+  isActive Boolean @default(true)
+
+  tenant Tenant        @relation(fields: [tenantId], references: [id])
+  plant  Plant         @relation(fields: [plantId], references: [id])
+  bins   WarehouseBin[]
+
+  @@unique([tenantId, code])
+}
+
+model WarehouseBin {
+  id          String @id @default(uuid())
+  warehouseId String
+  binCode     String
+  zone        String?
+  aisle       String?
+  rack        String?
+  level       String?
+  materialId  String?
+  quantity    Int     @default(0)
+  maxCapacity Int     @default(1000)
+  binType     String  @default("storage") // storage, picking, receiving, shipping
+
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id])
+  material  Material? @relation(fields: [materialId], references: [id])
+
+  @@unique([warehouseId, binCode])
+}
+
+// ─── Quality Management (QM) ────────────────────────────────────────
+
+model InspectionLot {
+  id            String   @id @default(uuid())
+  tenantId      String
+  lotNumber     String
+  materialId    String
+  quantity      Int
+  origin        String   // goods_receipt, production, return
+  referenceDoc  String?
+  status        String   @default("created") // created, in_inspection, accepted, rejected, use_decision
+  inspectedQty  Int      @default(0)
+  defectiveQty  Int      @default(0)
+  inspectedBy   String?
+  inspectedAt   DateTime?
+  createdAt     DateTime @default(now())
+
+  tenant   Tenant     @relation(fields: [tenantId], references: [id])
+  material Material   @relation(fields: [materialId], references: [id])
+  results  InspectionResult[]
+  nonConformances NonConformance[]
+
+  @@unique([tenantId, lotNumber])
+}
+
+model InspectionResult {
+  id              String @id @default(uuid())
+  inspectionLotId String
+  characteristic  String
+  specification   String?
+  measuredValue   String?
+  result          String // pass, fail, conditional
+  notes           String?
+  inspectedBy     String
+  inspectedAt     DateTime @default(now())
+
+  inspectionLot InspectionLot @relation(fields: [inspectionLotId], references: [id], onDelete: Cascade)
+}
+
+model NonConformance {
+  id              String   @id @default(uuid())
+  tenantId        String
+  ncNumber        String
+  inspectionLotId String?
+  description     String
+  severity        String   @default("minor") // minor, major, critical
+  status          String   @default("open") // open, investigating, corrective_action, closed
+  rootCause       String?
+  correctiveAction String?
+  assignedTo      String?
+  dueDate         DateTime?
+  closedAt        DateTime?
+  createdAt       DateTime @default(now())
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  inspectionLot InspectionLot? @relation(fields: [inspectionLotId], references: [id])
+}
+
+// ─── Plant Maintenance (PM) ─────────────────────────────────────────
+
+model Equipment {
+  id              String   @id @default(uuid())
+  tenantId        String
+  equipmentNumber String
+  description     String
+  category        String   // machine, vehicle, instrument, building
+  manufacturer    String?
+  model           String?
+  serialNumber    String?
+  plantId         String
+  location        String?
+  installDate     DateTime?
+  warrantyEnd     DateTime?
+  status          String   @default("active") // active, inactive, under_maintenance, decommissioned
+  criticality     String   @default("medium") // low, medium, high, critical
+  costCenterId    String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id])
+  plant      Plant       @relation(fields: [plantId], references: [id])
+  workOrders WorkOrder[]
+  maintenancePlans MaintenancePlan[]
+
+  @@unique([tenantId, equipmentNumber])
+}
+
+model WorkOrder {
+  id            String   @id @default(uuid())
+  tenantId      String
+  woNumber      String
+  equipmentId   String
+  type          String   // corrective, preventive, inspection, calibration
+  priority      String   @default("medium") // low, medium, high, urgent
+  description   String
+  status        String   @default("open") // open, in_progress, on_hold, completed, cancelled
+  plannedStart  DateTime?
+  plannedEnd    DateTime?
+  actualStart   DateTime?
+  actualEnd     DateTime?
+  estimatedHours Float?
+  actualHours   Float?
+  estimatedCost Float?
+  actualCost    Float?
+  assignedTo    String?
+  notes         String?
+  createdBy     String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tenant    Tenant    @relation(fields: [tenantId], references: [id])
+  equipment Equipment @relation(fields: [equipmentId], references: [id])
+
+  @@unique([tenantId, woNumber])
+}
+
+model MaintenancePlan {
+  id            String @id @default(uuid())
+  equipmentId   String
+  name          String
+  type          String // time_based, counter_based, condition_based
+  intervalDays  Int?
+  intervalHours Int?
+  lastExecuted  DateTime?
+  nextDue       DateTime?
+  isActive      Boolean @default(true)
+  createdAt     DateTime @default(now())
+
+  equipment Equipment @relation(fields: [equipmentId], references: [id])
+}
+
+// ─── Human Resources (HR) ───────────────────────────────────────────
+
+model Employee {
+  id             String   @id @default(uuid())
+  tenantId       String
+  employeeNumber String
+  firstName      String
+  lastName       String
+  email          String?
+  phone          String?
+  dateOfBirth    DateTime?
+  hireDate       DateTime
+  terminationDate DateTime?
+  department     String?
+  position       String?
+  managerId      String?
+  plantId        String?
+  orgUnitId      String?
+  employmentType String   @default("full_time") // full_time, part_time, contractor, intern
+  status         String   @default("active") // active, on_leave, terminated
+  salary         Float?
+  currency       String   @default("USD")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant  Tenant     @relation(fields: [tenantId], references: [id])
+  plant   Plant?     @relation(fields: [plantId], references: [id])
+  manager Employee?  @relation("ManagerRelation", fields: [managerId], references: [id])
+  reports Employee[] @relation("ManagerRelation")
+  orgUnit OrgUnit?   @relation(fields: [orgUnitId], references: [id])
+  leaves  LeaveRequest[]
+  timeEntries TimeEntry[]
+
+  @@unique([tenantId, employeeNumber])
+}
+
+model OrgUnit {
+  id        String @id @default(uuid())
+  name      String
+  code      String
+  parentId  String?
+  managerId String?
+  isActive  Boolean @default(true)
+
+  parent    OrgUnit?   @relation("OrgHierarchy", fields: [parentId], references: [id])
+  children  OrgUnit[]  @relation("OrgHierarchy")
+  employees Employee[]
+}
+
+model LeaveRequest {
+  id          String   @id @default(uuid())
+  employeeId  String
+  leaveType   String   // annual, sick, personal, maternity, unpaid
+  startDate   DateTime
+  endDate     DateTime
+  days        Float
+  status      String   @default("pending") // pending, approved, rejected, cancelled
+  reason      String?
+  approvedBy  String?
+  approvedAt  DateTime?
+  createdAt   DateTime @default(now())
+
+  employee Employee @relation(fields: [employeeId], references: [id])
+}
+
+model TimeEntry {
+  id          String   @id @default(uuid())
+  employeeId  String
+  date        DateTime
+  hoursWorked Float
+  overtime    Float    @default(0)
+  project     String?
+  activity    String?
+  notes       String?
+  status      String   @default("draft") // draft, submitted, approved
+  createdAt   DateTime @default(now())
+
+  employee Employee @relation(fields: [employeeId], references: [id])
+}
+
+// ─── Controlling (CO) ───────────────────────────────────────────────
+
+model CostCenter {
+  id          String   @id @default(uuid())
+  tenantId    String
+  code        String
+  name        String
+  description String?
+  category    String?  // production, admin, sales, research
+  managerId   String?
+  parentId    String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  tenant   Tenant      @relation(fields: [tenantId], references: [id])
+  parent   CostCenter? @relation("CostCenterHierarchy", fields: [parentId], references: [id])
+  children CostCenter[] @relation("CostCenterHierarchy")
+
+  @@unique([tenantId, code])
+}
+
+model InternalOrder {
+  id          String   @id @default(uuid())
+  tenantId    String
+  orderNumber String
+  description String
+  type        String   // overhead, investment, accrual
+  status      String   @default("open") // open, released, closed, locked
+  budget      Float    @default(0)
+  actualCost  Float    @default(0)
+  responsiblePerson String?
+  validFrom   DateTime?
+  validTo     DateTime?
+  createdAt   DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, orderNumber])
+}
+
+// ─── Workflow & Process Engine ───────────────────────────────────────
+
+model WorkflowDefinition {
+  id          String @id @default(uuid())
+  tenantId    String
+  name        String
+  description String?
+  module      String // finance, materials, sales, hr, etc.
+  triggerEvent String // e.g. "po_created", "journal_posted"
+  steps       String // JSON array of step definitions
+  isActive    Boolean @default(true)
+  createdAt   DateTime @default(now())
+
+  tenant    Tenant             @relation(fields: [tenantId], references: [id])
+  instances WorkflowInstance[]
+}
+
+model WorkflowInstance {
+  id           String   @id @default(uuid())
+  definitionId String
+  referenceId  String   // ID of the triggering document
+  currentStep  Int      @default(0)
+  status       String   @default("active") // active, completed, cancelled, error
+  context      String?  // JSON data
+  startedAt    DateTime @default(now())
+  completedAt  DateTime?
+
+  definition WorkflowDefinition @relation(fields: [definitionId], references: [id])
+  tasks      WorkflowTask[]
+}
+
+model WorkflowTask {
+  id         String   @id @default(uuid())
+  instanceId String
+  stepNumber Int
+  assigneeId String
+  action     String   // approve, reject, review, complete
+  status     String   @default("pending") // pending, completed, skipped
+  comment    String?
+  dueDate    DateTime?
+  completedAt DateTime?
+  createdAt  DateTime @default(now())
+
+  instance WorkflowInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  assignee User             @relation(fields: [assigneeId], references: [id])
+}
+
+// ─── Learning Features ──────────────────────────────────────────────
+
+model Exercise {
+  id          String @id @default(uuid())
+  tenantId    String
+  title       String
+  description String
+  module      String
+  difficulty  String @default("beginner") // beginner, intermediate, advanced
+  steps       String // JSON array of step instructions
+  hints       String? // JSON
+  solution    String? // JSON
+  estimatedMinutes Int @default(30)
+  isActive    Boolean @default(true)
+  sortOrder   Int     @default(0)
+  createdAt   DateTime @default(now())
+
+  tenant   Tenant             @relation(fields: [tenantId], references: [id])
+  progress ExerciseProgress[]
+}
+
+model ExerciseProgress {
+  id          String   @id @default(uuid())
+  exerciseId  String
+  userId      String
+  currentStep Int      @default(0)
+  status      String   @default("not_started") // not_started, in_progress, completed
+  score       Float?
+  startedAt   DateTime?
+  completedAt DateTime?
+  answers     String?  // JSON
+
+  exercise Exercise @relation(fields: [exerciseId], references: [id])
+  user     User     @relation(fields: [userId], references: [id])
+
+  @@unique([exerciseId, userId])
+}
+
+model Scenario {
+  id          String @id @default(uuid())
+  tenantId    String
+  name        String
+  description String
+  type        String // procure_to_pay, order_to_cash, plan_to_produce, hire_to_retire
+  steps       String // JSON array
+  sampleData  String? // JSON for auto-populating
+  isActive    Boolean @default(true)
+  createdAt   DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+}
+
+// ─── Reporting ──────────────────────────────────────────────────────
+
+model SavedReport {
+  id          String   @id @default(uuid())
+  tenantId    String
+  name        String
+  description String?
+  module      String
+  reportType  String   // table, chart, kpi, dashboard
+  config      String   // JSON - columns, filters, grouping, chart type
+  isPublic    Boolean  @default(false)
+  createdBy   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+}
+
+// ─── MRP (Material Requirements Planning) ────────────────────────────
+
+model MrpRun {
+  id           String   @id @default(uuid())
+  tenantId     String
+  runNumber    String
+  runDate      DateTime @default(now())
+  planningHorizonDays Int @default(90)
+  status       String   @default("draft") // draft, running, completed, error
+  parameters   String?  // JSON: included materials, planning strategy
+  results      String?  // JSON: summary stats
+  createdBy    String
+  createdAt    DateTime @default(now())
+
+  tenant       Tenant         @relation(fields: [tenantId], references: [id])
+  plannedOrders PlannedOrder[]
+
+  @@unique([tenantId, runNumber])
+}
+
+model DemandForecast {
+  id          String   @id @default(uuid())
+  tenantId    String
+  materialId  String
+  periodStart DateTime
+  periodEnd   DateTime
+  forecastQty Float
+  actualQty   Float?
+  method      String   @default("manual") // manual, moving_avg, exponential, regression
+  confidence  Float?
+  createdBy   String
+  createdAt   DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+}
+
+model PlannedOrder {
+  id           String   @id @default(uuid())
+  tenantId     String
+  mrpRunId     String?
+  materialId   String
+  orderType    String   // purchase, production
+  quantity     Float
+  unit         String   @default("EA")
+  plannedDate  DateTime
+  dueDate      DateTime
+  status       String   @default("planned") // planned, firmed, converted, cancelled
+  convertedTo  String?  // PO or production order ID
+  vendorId     String?  // for purchase-type planned orders
+  createdAt    DateTime @default(now())
+
+  tenant Tenant  @relation(fields: [tenantId], references: [id])
+  mrpRun MrpRun? @relation(fields: [mrpRunId], references: [id])
+}
+
+// ─── Advanced Production Scheduling ──────────────────────────────────
+
+model WorkCenter {
+  id           String  @id @default(uuid())
+  tenantId     String
+  code         String
+  name         String
+  type         String  // machine, assembly_line, manual, testing
+  capacity     Float   @default(8)  // hours per day
+  efficiency   Float   @default(100) // percentage
+  costRate     Float   @default(0)
+  status       String  @default("available") // available, busy, maintenance, offline
+  plantId      String?
+  isActive     Boolean @default(true)
+  createdAt    DateTime @default(now())
+
+  tenant       Tenant           @relation(fields: [tenantId], references: [id])
+  schedules    ProductionSchedule[]
+
+  @@unique([tenantId, code])
+}
+
+model ProductionSchedule {
+  id              String   @id @default(uuid())
+  tenantId        String
+  productionOrderId String
+  workCenterId    String
+  operation       String
+  setupTime       Float    @default(0)
+  runTime         Float    @default(0)
+  plannedStart    DateTime
+  plannedEnd      DateTime
+  actualStart     DateTime?
+  actualEnd       DateTime?
+  status          String   @default("scheduled") // scheduled, in_progress, completed, delayed
+  sequence        Int      @default(0)
+
+  tenant     Tenant     @relation(fields: [tenantId], references: [id])
+  workCenter WorkCenter @relation(fields: [workCenterId], references: [id])
+}
+
+// ─── Supply Chain Network ────────────────────────────────────────────
+
+model SupplyChainNode {
+  id          String @id @default(uuid())
+  tenantId    String
+  name        String
+  type        String // supplier, factory, warehouse, distribution_center, customer
+  latitude    Float?
+  longitude   Float?
+  capacity    Float? // units per period
+  holdingCost Float? // per unit per period
+  fixedCost   Float? // operating cost per period
+  address     String?
+  isActive    Boolean @default(true)
+  createdAt   DateTime @default(now())
+
+  tenant    Tenant            @relation(fields: [tenantId], references: [id])
+  outLinks  SupplyChainLink[] @relation("FromNode")
+  inLinks   SupplyChainLink[] @relation("ToNode")
+}
+
+model SupplyChainLink {
+  id              String @id @default(uuid())
+  tenantId        String
+  fromNodeId      String
+  toNodeId        String
+  transportMode   String @default("truck") // truck, rail, air, sea
+  distance        Float?
+  costPerUnit     Float  @default(0)
+  leadTimeDays    Float  @default(1)
+  capacity        Float? // max units per period
+  isActive        Boolean @default(true)
+
+  tenant   Tenant          @relation(fields: [tenantId], references: [id])
+  fromNode SupplyChainNode @relation("FromNode", fields: [fromNodeId], references: [id])
+  toNode   SupplyChainNode @relation("ToNode", fields: [toNodeId], references: [id])
+}
+
+// ─── Process Mining / Event Log ──────────────────────────────────────
+
+model ProcessEvent {
+  id          String   @id @default(uuid())
+  tenantId    String
+  caseId      String   // groups events in one process instance (e.g. PO-0000001)
+  activity    String   // e.g. "PO Created", "PO Approved", "Goods Received"
+  timestamp   DateTime @default(now())
+  resource    String?  // who performed it
+  module      String
+  documentId  String?
+  attributes  String?  // JSON: extra data
+  duration    Float?   // seconds since previous event in case
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, caseId])
+}
+
+// ─── Inventory Policies ──────────────────────────────────────────────
+
+model InventoryPolicy {
+  id             String @id @default(uuid())
+  tenantId       String
+  materialId     String
+  policyType     String // eoq, rop, min_max, periodic
+  orderQuantity  Float?
+  reorderPoint   Float?
+  safetyStock    Float?
+  minStock       Float?
+  maxStock       Float?
+  reviewPeriodDays Int?
+  annualDemand   Float?
+  orderingCost   Float?
+  holdingCostPct Float? // as % of unit cost
+  serviceLevelPct Float? // target service level
+  abcClass       String? // A, B, C
+  calculatedEOQ  Float?
+  calculatedROP  Float?
+  lastCalculated DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, materialId])
+}
+
+// ─── Gamification ────────────────────────────────────────────────────
+
+model UserXP {
+  id        String @id @default(uuid())
+  userId    String
+  tenantId  String
+  totalXP   Int    @default(0)
+  level     Int    @default(1)
+  streak    Int    @default(0)
+  lastActivityDate DateTime?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([userId, tenantId])
+}
+
+model Achievement {
+  id          String @id @default(uuid())
+  code        String @unique
+  name        String
+  description String
+  icon        String? // emoji or icon name
+  xpReward    Int    @default(50)
+  category    String // module, process, milestone
+  condition   String // JSON: conditions to unlock
+
+  userAchievements UserAchievement[]
+}
+
+model UserAchievement {
+  id            String   @id @default(uuid())
+  userId        String
+  achievementId String
+  unlockedAt    DateTime @default(now())
+
+  achievement Achievement @relation(fields: [achievementId], references: [id])
+
+  @@unique([userId, achievementId])
+}
+
+// ─── Operations KPIs ─────────────────────────────────────────────────
+
+model OperationsMetric {
+  id          String   @id @default(uuid())
+  tenantId    String
+  metricType  String   // oee, cycle_time, throughput, inventory_turnover, fill_rate, scrap_rate, mtbf, mttr
+  workCenterId String?
+  materialId  String?
+  periodStart DateTime
+  periodEnd   DateTime
+  value       Float
+  target      Float?
+  unit        String?
+  createdAt   DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+}
+
+// ─── Transaction Codes ───────────────────────────────────────────────
+
+model TransactionCode {
+  id          String @id @default(uuid())
+  code        String @unique
+  name        String
+  description String?
+  module      String
+  path        String  // frontend route
+  icon        String?
+  isActive    Boolean @default(true)
+}
+
+// ─── Fiscal Periods ──────────────────────────────────────────────────
+
+model FiscalPeriod {
+  id          String   @id @default(uuid())
+  tenantId    String
+  year        Int
+  period      Int      // 1-12 for months, 13-16 for special periods
+  name        String
+  startDate   DateTime
+  endDate     DateTime
+  status      String   @default("open") // open, closed, locked
+  closedBy    String?
+  closedAt    DateTime?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, year, period])
+}
+
+// ─── Accounts Payable (FI-AP) ────────────────────────────────────────
+
+model PurchaseRequisition {
+  id            String   @id @default(uuid())
+  tenantId      String
+  prNumber      String
+  materialId    String?
+  description   String
+  quantity      Float
+  unit          String   @default("EA")
+  estimatedPrice Float?
+  requestedDate DateTime?
+  vendorId      String?
+  status        String   @default("open") // open, approved, converted, rejected, closed
+  convertedPOId String?
+  requestedBy   String
+  approvedBy    String?
+  approvedAt    DateTime?
+  createdAt     DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, prNumber])
+}
+
+model SupplierInvoice {
+  id              String   @id @default(uuid())
+  tenantId        String
+  invoiceNumber   String
+  vendorId        String
+  poId            String?
+  grId            String?
+  invoiceDate     DateTime
+  dueDate         DateTime
+  grossAmount     Float
+  taxAmount       Float    @default(0)
+  netAmount       Float
+  currency        String   @default("USD")
+  status          String   @default("pending") // pending, verified, matched, approved, paid, disputed
+  matchStatus     String   @default("unmatched") // unmatched, 2way_matched, 3way_matched, mismatch
+  poAmount        Float?
+  grAmount        Float?
+  variance        Float?
+  paymentRef      String?
+  notes           String?
+  createdBy       String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, invoiceNumber])
+}
+
+model Payment {
+  id            String   @id @default(uuid())
+  tenantId      String
+  paymentNumber String
+  type          String   // outgoing (AP), incoming (AR)
+  vendorId      String?
+  customerId    String?
+  invoiceRef    String?
+  amount        Float
+  currency      String   @default("USD")
+  paymentMethod String   @default("bank_transfer") // bank_transfer, check, cash, card
+  paymentDate   DateTime
+  bankAccount   String?
+  reference     String?
+  status        String   @default("pending") // pending, completed, failed, reversed
+  notes         String?
+  createdBy     String
+  createdAt     DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, paymentNumber])
+}
+
+// ─── Pricing Conditions (SD) ─────────────────────────────────────────
+
+model PricingCondition {
+  id            String   @id @default(uuid())
+  tenantId      String
+  conditionType String   // base_price, discount_pct, discount_amt, surcharge, freight, tax
+  name          String
+  materialId    String?
+  customerId    String?
+  validFrom     DateTime @default(now())
+  validTo       DateTime?
+  value         Float    // percentage or amount depending on type
+  currency      String   @default("USD")
+  minQuantity   Float?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+}
+
+// ─── Transport / Logistics ───────────────────────────────────────────
+
+model Shipment {
+  id              String   @id @default(uuid())
+  tenantId        String
+  shipmentNumber  String
+  type            String   // inbound, outbound, transfer
+  carrier         String?
+  mode            String   @default("truck") // truck, rail, air, sea, courier
+  originAddress   String?
+  destAddress     String?
+  referenceDoc    String?  // PO or SO number
+  referenceType   String?  // purchase_order, sales_order, transfer
+  weight          Float?
+  volume          Float?
+  freightCost     Float    @default(0)
+  insuranceCost   Float    @default(0)
+  status          String   @default("planned") // planned, in_transit, delivered, cancelled
+  plannedDate     DateTime?
+  actualDate      DateTime?
+  trackingNumber  String?
+  notes           String?
+  createdBy       String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, shipmentNumber])
+}
+
+// ─── Asset Management ────────────────────────────────────────────────
+
+model Asset {
+  id                String   @id @default(uuid())
+  tenantId          String
+  assetNumber       String
+  description       String
+  category          String   // machinery, vehicle, computer, furniture, building
+  acquisitionDate   DateTime
+  acquisitionCost   Float
+  currentValue      Float
+  usefulLifeMonths  Int
+  depreciationMethod String  @default("straight_line") // straight_line, declining_balance, units_of_production
+  salvageValue      Float    @default(0)
+  accumulatedDepr   Float    @default(0)
+  monthlyDepr       Float    @default(0)
+  location          String?
+  assignedTo        String?
+  costCenterId      String?
+  status            String   @default("active") // active, under_maintenance, disposed, retired
+  disposalDate      DateTime?
+  disposalValue     Float?
+  notes             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  depreciationEntries AssetDepreciation[]
+
+  @@unique([tenantId, assetNumber])
+}
+
+model AssetDepreciation {
+  id          String   @id @default(uuid())
+  assetId     String
+  period      String   // YYYY-MM
+  amount      Float
+  bookValue   Float
+  method      String
+  postedAt    DateTime @default(now())
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+}
+
+// ─── Cost Estimates ──────────────────────────────────────────────────
+
+model CostEstimate {
+  id            String   @id @default(uuid())
+  tenantId      String
+  materialId    String?
+  productionOrderId String?
+  materialCost  Float    @default(0)
+  laborCost     Float    @default(0)
+  overheadCost  Float    @default(0)
+  totalCost     Float    @default(0)
+  costPerUnit   Float    @default(0)
+  quantity      Float    @default(1)
+  breakdown     String?  // JSON: detailed cost breakdown
+  status        String   @default("estimated") // estimated, released, actual
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+}
+
+// ─── ERP Time Machine (Event Sourcing) ───────────────────────────────
+
+model ERPEvent {
+  id          String   @id @default(uuid())
+  tenantId    String
+  eventType   String   // PURCHASE_ORDER_CREATED, GOODS_RECEIVED, INVOICE_POSTED, etc.
+  entityType  String   // purchase_order, sales_order, material, journal_entry, etc.
+  entityId    String
+  payload     String   // JSON: full state snapshot at time of event
+  delta       String?  // JSON: what changed
+  userId      String?
+  simulationDay Int?   // virtual day number for time machine
+  timestamp   DateTime @default(now())
+  version     Int      @default(1)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, entityType, entityId])
+  @@index([tenantId, simulationDay])
+}
+
+// ─── Live Simulation Engine ──────────────────────────────────────────
+
+model SimulationSession {
+  id              String   @id @default(uuid())
+  tenantId        String
+  name            String
+  status          String   @default("setup") // setup, running, paused, completed
+  currentDay      Int      @default(1)
+  totalDays       Int      @default(30)
+  speed           Float    @default(1.0) // simulation speed multiplier
+  parameters      String   // JSON: demand_volatility, lead_time_variability, failure_probability, etc.
+  state           String?  // JSON: current simulation state snapshot
+  results         String?  // JSON: final results and scores
+  createdBy       String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant Tenant              @relation(fields: [tenantId], references: [id])
+  events SimulationEvent[]
+}
+
+model SimulationEvent {
+  id              String   @id @default(uuid())
+  sessionId       String
+  day             Int
+  eventType       String   // demand_order, supplier_delay, machine_breakdown, quality_issue, transport_delay, demand_spike
+  severity        String   @default("medium") // low, medium, high, critical
+  description     String
+  affectedEntity  String?  // material ID, vendor ID, work center code
+  parameters      String?  // JSON: event-specific data
+  playerResponse  String?  // JSON: what the student did
+  resolved        Boolean  @default(false)
+  resolvedAt      DateTime?
+  createdAt       DateTime @default(now())
+
+  session SimulationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
+
+// ─── Instructor Control Panel ────────────────────────────────────────
+
+model InstructorAction {
+  id          String   @id @default(uuid())
+  tenantId    String
+  actionType  String
+  description String
+  parameters  String
+  targetEntity String?
+  appliedAt   DateTime @default(now())
+  expiresAt   DateTime?
+  isActive    Boolean  @default(true)
+  createdBy   String
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+}
+
+// ─── Multi-Company & Intercompany ────────────────────────────────────
+
+model Company {
+  id          String   @id @default(uuid())
+  tenantId    String
+  code        String
+  name        String
+  type        String   // factory, distribution, retail, holding, services
+  currency    String   @default("USD")
+  country     String   @default("US")
+  parentId    String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  tenant  Tenant    @relation(fields: [tenantId], references: [id])
+  parent  Company?  @relation("CompanyHierarchy", fields: [parentId], references: [id])
+  children Company[] @relation("CompanyHierarchy")
+
+  @@unique([tenantId, code])
+}
+
+model IntercompanyTransaction {
+  id              String   @id @default(uuid())
+  tenantId        String
+  transactionNumber String
+  fromCompanyCode String
+  toCompanyCode   String
+  type            String   // purchase, transfer, service
+  materialId      String?
+  quantity        Float?
+  amount          Float
+  currency        String   @default("USD")
+  transferPrice   Float?
+  status          String   @default("draft") // draft, approved, posted, cancelled
+  referenceDoc    String?
+  notes           String?
+  createdBy       String
+  createdAt       DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, transactionNumber])
+}
+
+model TransferPricingRule {
+  id              String   @id @default(uuid())
+  tenantId        String
+  fromCompanyCode String
+  toCompanyCode   String
+  materialId      String?
+  method          String   // cost_plus, market_price, negotiated, resale_minus
+  markupPct       Float?
+  fixedPrice      Float?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+}
+
+// ─── Financial Statements ────────────────────────────────────────────
+
+model FinancialStatement {
+  id          String   @id @default(uuid())
+  tenantId    String
+  type        String   // balance_sheet, income_statement, cash_flow
+  periodYear  Int
+  periodMonth Int
+  companyCode String?
+  status      String   @default("draft") // draft, final
+  data        String   // JSON: structured statement data with line items
+  generatedAt DateTime @default(now())
+  generatedBy String
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+}
+
+// ─── Period Closing ──────────────────────────────────────────────────
+
+model ClosingPeriod {
+  id          String   @id @default(uuid())
+  tenantId    String
+  year        Int
+  month       Int
+  status      String   @default("open") // open, in_progress, closed
+  checklist   String   // JSON array of tasks with completion status
+  startedAt   DateTime?
+  completedAt DateTime?
+  completedBy String?
+  createdAt   DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, year, month])
+}
+
+// ─── Supplier & Customer Portals ─────────────────────────────────────
+
+model PortalAccess {
+  id          String   @id @default(uuid())
+  tenantId    String
+  portalType  String   // supplier, customer
+  externalId  String   // vendor or customer ID
+  email       String
+  name        String
+  accessToken String?
+  permissions String   // JSON: allowed actions
+  lastLogin   DateTime?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+}
+
+// ─── Data Warehouse / OLAP ───────────────────────────────────────────
+
+model FactSales {
+  id          String   @id @default(uuid())
+  tenantId    String
+  dateKey     String   // YYYY-MM-DD
+  customerId  String
+  materialId  String
+  companyCode String?
+  quantity    Float
+  revenue     Float
+  cost        Float
+  profit      Float
+  discount    Float    @default(0)
+  region      String?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, dateKey])
+}
+
+model FactInventory {
+  id              String @id @default(uuid())
+  tenantId        String
+  dateKey         String // YYYY-MM-DD
+  materialId      String
+  warehouseId     String?
+  stockQuantity   Float
+  stockValue      Float
+  inboundQty      Float  @default(0)
+  outboundQty     Float  @default(0)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, dateKey])
+}
+
+// ─── Optimization Engine ─────────────────────────────────────────────
+
+model OptimizationRun {
+  id          String   @id @default(uuid())
+  tenantId    String
+  type        String   // warehouse_location, production_scheduling, inventory_policy, transport_route
+  name        String
+  parameters  String   // JSON: algorithm params, constraints
+  algorithm   String   // linear_programming, genetic_algorithm, abc, simulated_annealing, greedy
+  status      String   @default("pending") // pending, running, completed, failed
+  result      String?  // JSON: optimal solution, objective value
+  iterations  Int?
+  objectiveValue Float?
+  runtime     Float?   // seconds
+  createdBy   String
+  createdAt   DateTime @default(now())
+  completedAt DateTime?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+}
+
+// ─── Integration Layer ───────────────────────────────────────────────
+
+model IntegrationEndpoint {
+  id          String   @id @default(uuid())
+  tenantId    String
+  name        String
+  type        String   // webhook, rest_api, message_queue, file_transfer
+  direction   String   // inbound, outbound
+  url         String?
+  method      String?  // GET, POST, PUT
+  headers     String?  // JSON
+  authType    String?  // none, api_key, oauth2, basic
+  eventTrigger String? // PO_CREATED, SO_SHIPPED, INVOICE_POSTED
+  isActive    Boolean  @default(true)
+  lastTriggered DateTime?
+  createdAt   DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+}
+
+model IntegrationLog {
+  id          String   @id @default(uuid())
+  tenantId    String
+  endpointId  String?
+  direction   String   // inbound, outbound
+  eventType   String
+  payload     String   // JSON
+  response    String?  // JSON
+  statusCode  Int?
+  success     Boolean
+  errorMessage String?
+  duration    Float?   // ms
+  createdAt   DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+}
+
+// ─── Document Management ─────────────────────────────────────────────
+
+model Document {
+  id          String   @id @default(uuid())
+  tenantId    String
+  name        String
+  type        String   // contract, invoice_pdf, po_pdf, report, attachment, image
+  mimeType    String?
+  size        Int?     // bytes
+  entityType  String?  // purchase_order, sales_order, invoice, vendor, customer
+  entityId    String?
+  description String?
+  content     String?  // base64 for small files or text content
+  filePath    String?
+  tags        String?  // JSON array of tags
+  uploadedBy  String
+  createdAt   DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+}
+
+// ─── Performance Monitoring ──────────────────────────────────────────
+
+model SystemMetric {
+  id          String   @id @default(uuid())
+  tenantId    String?
+  metricType  String   // api_response_time, db_query_time, active_users, memory_usage, error_rate
+  endpoint    String?
+  value       Float
+  unit        String?  // ms, count, percent, bytes
+  tags        String?  // JSON
+  timestamp   DateTime @default(now())
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id])
+}
+
+// ─── Course Mode ─────────────────────────────────────────────────────
+
+model Course {
+  id          String   @id @default(uuid())
+  tenantId    String
+  code        String
+  title       String
+  description String?
+  instructor  String?
+  difficulty  String   @default("beginner") // beginner, intermediate, advanced
+  estimatedHours Float @default(10)
+  isPublished Boolean  @default(false)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id])
+  lessons Lesson[]
+
+  @@unique([tenantId, code])
+}
+
+model Lesson {
+  id          String   @id @default(uuid())
+  courseId     String
+  lessonNumber Int
+  title       String
+  description String?
+  content     String   // JSON: rich content, instructions, media refs
+  modulesUsed String?  // JSON: which ERP modules are unlocked/used
+  objectives  String?  // JSON: learning objectives
+  estimatedMinutes Int @default(30)
+  sortOrder   Int      @default(0)
+
+  course   Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  progress LessonProgress[]
+}
+
+model LessonProgress {
+  id          String    @id @default(uuid())
+  lessonId    String
+  userId      String
+  status      String    @default("not_started") // not_started, in_progress, completed
+  score       Float?
+  startedAt   DateTime?
+  completedAt DateTime?
+  attempts    Int       @default(0)
+  notes       String?
+
+  lesson Lesson @relation(fields: [lessonId], references: [id])
+
+  @@unique([lessonId, userId])
+}
+
+// ─── ERP Certification ───────────────────────────────────────────────
+
+model Certification {
+  id          String   @id @default(uuid())
+  tenantId    String
+  code        String
+  title       String
+  description String?
+  modulesCovered String // JSON: list of modules tested
+  passingScore Float   @default(70)
+  timeLimit   Int?     // minutes
+  tasks       String   // JSON: array of tasks to complete with validation rules
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  tenant   Tenant              @relation(fields: [tenantId], references: [id])
+  attempts CertificationAttempt[]
+
+  @@unique([tenantId, code])
+}
+
+model CertificationAttempt {
+  id              String   @id @default(uuid())
+  certificationId String
+  userId          String
+  status          String   @default("in_progress") // in_progress, passed, failed, abandoned
+  score           Float?
+  startedAt       DateTime @default(now())
+  completedAt     DateTime?
+  taskResults     String?  // JSON: per-task pass/fail details
+  timeSpent       Int?     // seconds
+
+  certification Certification @relation(fields: [certificationId], references: [id])
+
+  @@index([userId, certificationId])
+}
+
+// ─── Dataset Generator ───────────────────────────────────────────────
+
+model DatasetTemplate {
+  id          String   @id @default(uuid())
+  tenantId    String
+  name        String
+  description String?
+  config      String
+  status      String   @default("ready")
+  lastGenerated DateTime?
+  createdBy   String
+  createdAt   DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+}
+
+// ─── Business Process Flow Designer ─────────────────────────────────
+
+model ProcessFlow {
+  id          String   @id @default(uuid())
+  tenantId    String
+  name        String
+  description String?
+  processType String   // procure_to_pay, order_to_cash, production, custom
+  nodes       String   // JSON: array of {id, type, label, x, y, data}
+  edges       String   // JSON: array of {id, source, target, label}
+  isTemplate  Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  createdBy   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+}
+
+// ─── Digital Twin ────────────────────────────────────────────────────
+
+model DigitalTwinState {
+  id          String   @id @default(uuid())
+  tenantId    String
+  timestamp   DateTime @default(now())
+  factories   String   // JSON: [{id, name, status, utilization, activeOrders}]
+  warehouses  String   // JSON: [{id, name, stockLevel, capacity, inbound, outbound}]
+  suppliers   String   // JSON: [{id, name, status, inTransit, reliability}]
+  customers   String   // JSON: [{id, name, pendingOrders, satisfaction}]
+  transport   String   // JSON: [{id, from, to, status, cargo, eta}]
+  kpis        String   // JSON: {revenue, cost, inventory, serviceLevel, onTimeDelivery}
+  alerts      String?  // JSON: [{type, severity, message, entity}]
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, timestamp])
+}
+
+// ─── Industry Templates ──────────────────────────────────────────────
+
+model IndustryTemplate {
+  id          String   @id @default(uuid())
+  tenantId    String?
+  industry    String   // automotive, retail, electronics, pharma, food, custom
+  name        String
+  description String?
+  config      String   // JSON: {materials, boms, routings, customers, vendors, demandPatterns, logistics}
+  isGlobal    Boolean  @default(false)
+  createdBy   String?
+  createdAt   DateTime @default(now())
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id])
+}
+
+// ─── Decision Impact Engine ──────────────────────────────────────────
+
+model DecisionImpact {
+  id          String   @id @default(uuid())
+  tenantId    String
+  decisionType String  // increase_safety_stock, change_supplier, adjust_price, change_lot_size, add_shift
+  parameters  String   // JSON: decision parameters
+  impacts     String   // JSON: [{metric, before, after, change, explanation}]
+  tradeoffs   String?  // JSON: [{positive, negative}]
+  recommendation String?
+  createdBy   String
+  createdAt   DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+}
+
+// ─── Benchmark / Competition ─────────────────────────────────────────
+
+model BenchmarkRun {
+  id          String   @id @default(uuid())
+  tenantId    String
+  name        String
+  description String?
+  startDate   DateTime
+  endDate     DateTime
+  metrics     String   // JSON: [{name, weight}] - which metrics to compare
+  status      String   @default("active") // active, completed, archived
+  results     String?  // JSON: [{userId, scores, rank}]
+  createdBy   String
+  createdAt   DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+}
+
+// ─── Stress Test Scenarios ───────────────────────────────────────────
+
+model StressTest {
+  id          String   @id @default(uuid())
+  tenantId    String
+  name        String
+  scenario    String   // black_friday, supplier_bankruptcy, transport_strike, machine_cascade, cyber_attack
+  description String?
+  config      String   // JSON: scenario parameters (severity, duration, affected entities)
+  status      String   @default("ready") // ready, running, completed, failed
+  events      String?  // JSON: array of generated crisis events
+  studentActions String? // JSON: array of student responses
+  score       Float?
+  startedAt   DateTime?
+  completedAt DateTime?
+  userId      String
+  createdAt   DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+}
+
+// ─── Real-Time Collaboration / Presence ──────────────────────────────
+
+model UserPresence {
+  id          String   @id @default(uuid())
+  tenantId    String
+  userId      String
+  userName    String
+  currentPage String?
+  currentAction String?
+  role        String?
+  isOnline    Boolean  @default(true)
+  lastSeen    DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, userId])
+}
