@@ -287,9 +287,9 @@ router.post("/run", async (req: Request, res: Response, next: NextFunction) => {
         // Fallback to forecasts table
         const forecasts = await prisma.demandForecast.findMany({
           where: { tenantId, materialId },
-          orderBy: { period: "asc" },
+          orderBy: { periodStart: "asc" },
         });
-        inputData = forecasts.length >= 3 ? forecasts.map((f) => f.forecastQuantity) : Array.from({ length: 12 }, () => 50 + Math.random() * 100);
+        inputData = forecasts.length >= 3 ? forecasts.map((f) => f.forecastQty) : Array.from({ length: 12 }, () => 50 + Math.random() * 100);
       } else {
         inputData = soItems.map((i) => i.quantity);
       }

@@ -354,7 +354,7 @@ router.get("/network-graph", async (req: Request, res: Response, next: NextFunct
           id: `plant_${p.id}`,
           label: p.name,
           type: "plant",
-          location: p.city ?? p.country ?? "",
+          location: p.address ?? "",
         },
         classes: "plant",
       });
@@ -487,9 +487,8 @@ router.get("/demand-signals", async (req: Request, res: Response, next: NextFunc
     const tenantId = req.user!.tenantId;
     const forecasts = await prisma.demandForecast.findMany({
       where: { tenantId },
-      orderBy: { period: "asc" },
+      orderBy: { periodStart: "asc" },
       take: 50,
-      include: { material: { select: { description: true, materialNumber: true } } },
     });
 
     const salesTrend = await prisma.salesOrder.findMany({

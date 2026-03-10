@@ -265,16 +265,24 @@ router.post("/:id/apply", requireRoles("admin", "instructor"), async (req: Reque
   try {
     const tenantId = req.user!.tenantId;
     const id = String(req.params.id ?? "");
-    let config: { materials?: string[]; boms?: unknown; suppliers?: number; customers?: number; demandPattern?: string };
+    type TemplateMaterial = string | { name: string; type?: string; unit?: string; price?: number; safetyStock?: number };
+    type TemplateConfig = {
+      materials?: TemplateMaterial[];
+      boms?: unknown;
+      suppliers?: number;
+      customers?: number;
+      demandPattern?: string;
+    };
+    let config: TemplateConfig;
     const prebuilt = PREBUILT_TEMPLATES.find((t) => t.id === id);
     if (prebuilt) {
-      config = prebuilt.config as typeof config;
+      config = prebuilt.config as TemplateConfig;
     } else {
       const template = await prisma.industryTemplate.findFirst({
         where: { id, OR: [{ tenantId }, { isGlobal: true }] },
       });
       if (!template) throw new AppError(404, "Template not found");
-      config = JSON.parse(template.config) as typeof config;
+      config = JSON.parse(template.config) as TemplateConfig;
     }
     let materialsCreated = 0;
     let bomsCreated = 0;
@@ -282,16 +290,17 @@ router.post("/:id/apply", requireRoles("admin", "instructor"), async (req: Reque
     let customersCreated = 0;
     const materials = config.materials ?? [];
     for (const mat of materials) {
+      const matName = typeof mat === "string" ? mat : mat.name;
       const existing = await prisma.material.findFirst({
-        where: { tenantId, materialNumber: mat.replace(/\s/g, "-").toUpperCase() },
+        where: { tenantId, materialNumber: matName.replace(/\s/g, "-").toUpperCase() },
       });
       if (!existing) {
         await prisma.material.create({
           data: {
             tenantId,
-            materialNumber: mat.replace(/\s/g, "-").toUpperCase(),
-            description: mat,
-            type: materials.indexOf(mat) < materials.length - 1 ? "raw" : "finished",
+            materialNumber: matName.replace(/\s/g, "-").toUpperCase(),
+            description: matName,
+            type: (typeof mat !== "string" && mat.type) ? mat.type : (materials.indexOf(mat) < materials.length - 1 ? "raw" : "finished"),
           },
         });
         materialsCreated++;
