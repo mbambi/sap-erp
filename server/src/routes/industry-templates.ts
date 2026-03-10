@@ -266,17 +266,18 @@ router.post("/:id/apply", requireRoles("admin", "instructor"), async (req: Reque
     const tenantId = req.user!.tenantId;
     const id = String(req.params.id ?? "");
     type TemplateMaterial = string | { name: string; type?: string; unit?: string; price?: number; safetyStock?: number };
+    type TemplateSupplier = { name: string; materials?: string[]; leadTime?: number };
     type TemplateConfig = {
       materials?: TemplateMaterial[];
       boms?: unknown;
-      suppliers?: number;
+      suppliers?: number | TemplateSupplier[];
       customers?: number;
       demandPattern?: string;
     };
     let config: TemplateConfig;
     const prebuilt = PREBUILT_TEMPLATES.find((t) => t.id === id);
     if (prebuilt) {
-      config = prebuilt.config as TemplateConfig;
+      config = prebuilt.config as unknown as TemplateConfig;
     } else {
       const template = await prisma.industryTemplate.findFirst({
         where: { id, OR: [{ tenantId }, { isGlobal: true }] },
@@ -306,7 +307,7 @@ router.post("/:id/apply", requireRoles("admin", "instructor"), async (req: Reque
         materialsCreated++;
       }
     }
-    const vendorCount = config.suppliers ?? 3;
+    const vendorCount = Array.isArray(config.suppliers) ? config.suppliers.length : (config.suppliers ?? 3);
     for (let i = 0; i < vendorCount; i++) {
       const num = String(i + 1).padStart(4, "0");
       const existing = await prisma.vendor.findFirst({
@@ -341,8 +342,10 @@ router.post("/:id/apply", requireRoles("admin", "instructor"), async (req: Reque
       }
     }
     if (config.boms && materials.length >= 2) {
+      const lastMaterial = materials[materials.length - 1];
+      const lastMaterialName = typeof lastMaterial === "string" ? lastMaterial : lastMaterial.name;
       const finishedMat = await prisma.material.findFirst({
-        where: { tenantId, materialNumber: materials[materials.length - 1].replace(/\s/g, "-").toUpperCase() },
+        where: { tenantId, materialNumber: lastMaterialName.replace(/\s/g, "-").toUpperCase() },
       });
       if (finishedMat) {
         const existingBom = await prisma.billOfMaterial.findFirst({
