@@ -45,32 +45,43 @@ router.get("/runs", async (req: Request, res: Response, next: NextFunction) => {
   }
 });
 
-/** POST /runs - Create and execute an MRP run */
 router.post("/runs", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const tenantId = tenantScope(req);
     const userId = req.user!.userId;
     const { planningHorizonDays = 90 } = req.body;
 
-    // Auto-generate run number MRP-XXXXXXX
-    const runCount = await prisma.mrpRun.count({ where: { tenantId } });
-    const runNumber = `MRP-${String(runCount + 1).padStart(7, "0")}`;
+    // Generate collision-resistant run numbers to avoid count() race conditions.
+    let run: any;
+    let runNumber = "";
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const base = String(Date.now() % 10000000).padStart(7, "0");
+      runNumber = attempt === 0 ? `MRP-${base}` : `MRP-${base}-${attempt}`;
+
+      try {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        run = await prisma.mrpRun.create({
+          data: {
+            tenantId,
+            runNumber,
+            runDate: today,
+            planningHorizonDays: Number(planningHorizonDays) || 90,
+            status: "running",
+            parameters: JSON.stringify({ planningHorizonDays }),
+            createdBy: userId,
+          },
+        });
+        break;
+      } catch (err: any) {
+        if (err?.code !== "P2002" || attempt === 2) throw err;
+      }
+    }
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-
-    // Create run record (draft first, then update to completed)
-    const run = await prisma.mrpRun.create({
-      data: {
-        tenantId,
-        runNumber,
-        runDate: today,
-        planningHorizonDays: Number(planningHorizonDays) || 90,
-        status: "running",
-        parameters: JSON.stringify({ planningHorizonDays }),
-        createdBy: userId,
-      },
-    });
+    if (!run) throw new AppError(409, "MRP run number collision. Please retry.");
 
     try {
       const materials = await prisma.material.findMany({
@@ -172,22 +183,24 @@ router.post("/runs", async (req: Request, res: Response, next: NextFunction) => 
         }
       }
 
-      // Create planned orders
-      for (const po of plannedOrders) {
-        await prisma.plannedOrder.create({
-          data: {
-            tenantId,
-            mrpRunId: run.id,
-            materialId: po.materialId,
-            orderType: po.orderType,
-            quantity: po.quantity,
-            unit: po.unit,
-            plannedDate: po.plannedDate,
-            dueDate: po.dueDate,
-            status: "planned",
-          },
-        });
-      }
+      // Create planned orders atomically to avoid partial persistence.
+      await prisma.$transaction(
+        plannedOrders.map((po) =>
+          prisma.plannedOrder.create({
+            data: {
+              tenantId,
+              mrpRunId: run.id,
+              materialId: po.materialId,
+              orderType: po.orderType,
+              quantity: po.quantity,
+              unit: po.unit,
+              plannedDate: po.plannedDate,
+              dueDate: po.dueDate,
+              status: "planned",
+            },
+          })
+        )
+      );
 
       const results = {
         materialsProcessed: materials.length,
@@ -251,22 +264,32 @@ router.post("/runs/advanced", async (req: Request, res: Response, next: NextFunc
       includeSafetyStock = true,
     } = req.body;
 
-    const runCount = await prisma.mrpRun.count({ where: { tenantId } });
-    const runNumber = `MRP-${String(runCount + 1).padStart(7, "0")}`;
+    let run: any;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const base = String(Date.now() % 10000000).padStart(7, "0");
+      const runNumber = attempt === 0 ? `MRP-${base}` : `MRP-${base}-${attempt}`;
 
-    const run = await prisma.mrpRun.create({
-      data: {
-        tenantId,
-        runNumber,
-        runDate: new Date(),
-        planningHorizonDays: Number(planningHorizonDays),
-        status: "running",
-        parameters: JSON.stringify({
-          planningHorizonDays, lotSizingPolicy, fixedLotSize, includeForecast, includeSafetyStock,
-        }),
-        createdBy: userId,
-      },
-    });
+      try {
+        run = await prisma.mrpRun.create({
+          data: {
+            tenantId,
+            runNumber,
+            runDate: new Date(),
+            planningHorizonDays: Number(planningHorizonDays),
+            status: "running",
+            parameters: JSON.stringify({
+              planningHorizonDays, lotSizingPolicy, fixedLotSize, includeForecast, includeSafetyStock,
+            }),
+            createdBy: userId,
+          },
+        });
+        break;
+      } catch (err: any) {
+        if (err?.code !== "P2002" || attempt === 2) throw err;
+      }
+    }
+
+    if (!run) throw new AppError(409, "MRP run number collision. Please retry.");
 
     try {
       const config: MrpConfig = {
@@ -281,22 +304,24 @@ router.post("/runs/advanced", async (req: Request, res: Response, next: NextFunc
 
       const result = await runMrpEngine(config);
 
-      // Persist planned orders
-      for (const po of result.plannedOrders) {
-        await prisma.plannedOrder.create({
-          data: {
-            tenantId,
-            mrpRunId: run.id,
-            materialId: po.materialId,
-            orderType: po.orderType,
-            quantity: po.quantity,
-            unit: po.unit,
-            plannedDate: po.plannedDate,
-            dueDate: po.dueDate,
-            status: "planned",
-          },
-        });
-      }
+      // Persist planned orders atomically.
+      await prisma.$transaction(
+        result.plannedOrders.map((po) =>
+          prisma.plannedOrder.create({
+            data: {
+              tenantId,
+              mrpRunId: run.id,
+              materialId: po.materialId,
+              orderType: po.orderType,
+              quantity: po.quantity,
+              unit: po.unit,
+              plannedDate: po.plannedDate,
+              dueDate: po.dueDate,
+              status: "planned",
+            },
+          })
+        )
+      );
 
       await prisma.mrpRun.update({
         where: { id: run.id },

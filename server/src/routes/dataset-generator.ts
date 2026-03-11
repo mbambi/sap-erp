@@ -395,7 +395,10 @@ router.post(
             leadTimeDays: randomInt(3, 21),
             lotSize: pick([1, 10, 25, 50, 100]),
           },
-        }).catch(() => null);
+          }).catch((err) => {
+            console.error(`[DatasetGenerator] Failed to create raw material RM-${String(i + 1).padStart(5, "0")}:`, err);
+            return null;
+          });
         if (m) createdMaterials.push({ id: m.id, type: "raw" });
       }
 
@@ -413,7 +416,10 @@ router.post(
             leadTimeDays: randomInt(2, 10),
             lotSize: pick([1, 5, 10, 25]),
           },
-        }).catch(() => null);
+          }).catch((err) => {
+            console.error(`[DatasetGenerator] Failed to create semi-finished material SF-${String(i + 1).padStart(5, "0")}:`, err);
+            return null;
+          });
         if (m) createdMaterials.push({ id: m.id, type: "semi-finished" });
       }
 
@@ -431,7 +437,10 @@ router.post(
             leadTimeDays: randomInt(5, 30),
             lotSize: pick([1, 5, 10]),
           },
-        }).catch(() => null);
+          }).catch((err) => {
+            console.error(`[DatasetGenerator] Failed to create finished material FG-${String(i + 1).padStart(5, "0")}:`, err);
+            return null;
+          });
         if (m) createdMaterials.push({ id: m.id, type: "finished" });
       }
       counts.materials = createdMaterials.length;

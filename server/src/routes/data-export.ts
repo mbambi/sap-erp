@@ -1,10 +1,11 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { prisma } from "../prisma";
-import { authenticate } from "../middleware/auth";
+import { authenticate, requireRoles } from "../middleware/auth";
 import { AppError } from "../middleware/errorHandler";
 
 const router = Router();
 router.use(authenticate);
+router.use(requireRoles("admin", "instructor"));
 
 const EXPORTABLE_ENTITIES: Record<string, { model: string; tenantScoped: boolean }> = {
   materials: { model: "material", tenantScoped: true },
@@ -85,6 +86,7 @@ router.get("/json/:entity", async (req: Request, res: Response, next: NextFuncti
     if (!config) throw new AppError(400, `Unknown entity: ${entity}`);
 
     const model = (prisma as any)[config.model];
+    if (!model) throw new AppError(500, "Model not found");
     const where = config.tenantScoped ? { tenantId } : {};
     const limit = Math.min(10000, parseInt(req.query.limit as string) || 1000);
 

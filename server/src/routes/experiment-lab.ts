@@ -506,6 +506,12 @@ function runBullwhipSimulation(params: Record<string, number>): Record<string, u
 function runSchedulingComparison(params: Record<string, number>): Record<string, unknown> {
   const { numJobs, numMachines, maxProcessingTime, maxDueDate } = params;
 
+  // Validate input parameters
+  if (numMachines < 1) throw new AppError(400, "numMachines must be at least 1");
+  if (numJobs < 1) throw new AppError(400, "numJobs must be at least 1");
+  if (maxProcessingTime < 1) throw new AppError(400, "maxProcessingTime must be at least 1");
+  if (maxDueDate < 1) throw new AppError(400, "maxDueDate must be at least 1");
+
   // Generate random jobs
   const jobs = Array.from({ length: numJobs }, (_, i) => ({
     id: `J${i + 1}`,
@@ -543,7 +549,7 @@ function runSchedulingComparison(params: Record<string, number>): Record<string,
     const avgTardiness = results.reduce((s, r) => s + r.tardiness, 0) / results.length;
     const numLate = results.filter((r) => r.late).length;
     const totalWork = jobs.reduce((s, j) => s + j.processingTime, 0);
-    const utilization = (totalWork / (numMachines * makespan)) * 100;
+      const utilization = makespan > 0 ? (totalWork / (numMachines * makespan)) * 100 : 0;
 
     return {
       schedule: results,

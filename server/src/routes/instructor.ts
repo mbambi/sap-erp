@@ -351,7 +351,10 @@ router.get("/student-activity", async (req: Request, res: Response, next: NextFu
         include: { exercise: true },
         orderBy: { completedAt: "desc" },
         take: 50,
-      }).catch(() => []),
+        }).catch((err) => {
+          console.error("[InstructorDashboard] Failed to fetch exercise progress:", err);
+          return [];
+        }),
       prisma.simulationSession.findMany({
         where: { tenantId },
         include: { events: true },

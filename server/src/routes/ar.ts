@@ -119,47 +119,70 @@ router.post("/receive-payment", async (req: Request, res: Response, next: NextFu
     const tid = req.user!.tenantId;
     const { invoiceId, amount, paymentMethod, paymentDate, reference } = req.body;
 
-    const inv = await prisma.invoice.findFirst({
-      where: {
-        id: invoiceId,
-        salesOrder: { tenantId: tid },
-      },
-    });
-    if (!inv) throw new AppError(404, "Invoice not found");
-    if (inv.status === "paid") throw new AppError(400, "Invoice already paid");
+    let result: { payment: any; invoice: any } | null = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        result = await prisma.$transaction(async (tx) => {
+          const inv = await tx.invoice.findFirst({
+            where: {
+              id: invoiceId,
+              salesOrder: { tenantId: tid },
+            },
+          });
+          if (!inv) throw new AppError(404, "Invoice not found");
+          if (inv.status === "paid") throw new AppError(400, "Invoice already paid");
 
-    const newPaidAmount = inv.paidAmount + (amount ?? inv.totalAmount - inv.paidAmount);
-    const isFullyPaid = newPaidAmount >= inv.totalAmount;
+          const customer = await tx.customer.findFirst({
+            where: { id: inv.customerId, tenantId: tid },
+            select: { id: true },
+          });
+          if (!customer) throw new AppError(400, "Customer not found for invoice");
 
-    const paymentCount = await prisma.payment.count({ where: { tenantId: tid } });
-    const paymentNumber = `PAY-${String(paymentCount + 1).padStart(7, "0")}`;
+          const remaining = inv.totalAmount - inv.paidAmount;
+          const paymentAmount = Number(amount ?? remaining);
+          if (paymentAmount <= 0) throw new AppError(400, "Payment amount must be greater than 0");
 
-    const payment = await prisma.payment.create({
-      data: {
-        tenantId: tid,
-        paymentNumber,
-        type: "incoming",
-        customerId: inv.customerId,
-        invoiceRef: inv.invoiceNumber,
-        amount: amount ?? inv.totalAmount - inv.paidAmount,
-        currency: inv.currency,
-        paymentMethod: paymentMethod || "bank_transfer",
-        paymentDate: paymentDate ? new Date(paymentDate) : new Date(),
-        reference: reference || null,
-        status: "completed",
-        createdBy: req.user!.userId,
-      },
-    });
+          const newPaidAmount = inv.paidAmount + paymentAmount;
+          const isFullyPaid = newPaidAmount >= inv.totalAmount;
 
-    const updated = await prisma.invoice.update({
-      where: { id: inv.id },
-      data: {
-        paidAmount: newPaidAmount,
-        status: isFullyPaid ? "paid" : inv.status,
-      },
-    });
+          const paymentCount = await tx.payment.count({ where: { tenantId: tid } });
+          const paymentNumber = `PAY-${String(paymentCount + 1 + attempt).padStart(7, "0")}`;
 
-    res.status(201).json({ payment, invoice: updated });
+          const payment = await tx.payment.create({
+            data: {
+              tenantId: tid,
+              paymentNumber,
+              type: "incoming",
+              customerId: inv.customerId,
+              invoiceRef: inv.invoiceNumber,
+              amount: paymentAmount,
+              currency: inv.currency,
+              paymentMethod: paymentMethod || "bank_transfer",
+              paymentDate: paymentDate ? new Date(paymentDate) : new Date(),
+              reference: reference || null,
+              status: "completed",
+              createdBy: req.user!.userId,
+            },
+          });
+
+          const updated = await tx.invoice.update({
+            where: { id: inv.id },
+            data: {
+              paidAmount: newPaidAmount,
+              status: isFullyPaid ? "paid" : inv.status,
+            },
+          });
+
+          return { payment, invoice: updated };
+        });
+        break;
+      } catch (err: any) {
+        if (err?.code !== "P2002" || attempt === 2) throw err;
+      }
+    }
+
+    if (!result) throw new AppError(409, "Payment number collision. Please retry.");
+    res.status(201).json(result);
   } catch (err) {
     next(err);
   }
