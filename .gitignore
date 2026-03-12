@@ -9,3 +9,14 @@ Thumbs.db
 *.log
 coverage/
 .turbo/
+
+# Keep only server/ and Render deployment files in GitHub
+# Exclude client development files
+client/
+README.md
+DEPLOY.md
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
