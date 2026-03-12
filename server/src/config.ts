@@ -20,7 +20,7 @@ export const config = {
   nodeEnv,
   corsOrigin: process.env.CORS_ORIGIN || "http://localhost:5173",
   redisUrl: process.env.REDIS_URL || "",
-  // Temporary default for load testing E2E against hosted backend.
-  // Set RATE_LIMITING_ENABLED=true to turn rate limiting back on.
-  rateLimitingEnabled: (process.env.RATE_LIMITING_ENABLED || "false").toLowerCase() === "true",
+  // Rate limiting is enabled by default.
+  // Set RATE_LIMITING_ENABLED=false to disable rate limiting.
+  rateLimitingEnabled: (process.env.RATE_LIMITING_ENABLED || "true").toLowerCase() === "true",
 };
