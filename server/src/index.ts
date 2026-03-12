@@ -1,4 +1,5 @@
 import express from "express";
+import type { RequestHandler } from "express";
 import cors from "cors";
 import helmet from "helmet";
 import { config } from "./config";
@@ -81,14 +82,18 @@ import forecastingRoutes from "./routes/forecasting";
 import multiEchelonRoutes from "./routes/multi-echelon";
 
 const app = express();
+const noRateLimit: RequestHandler = (_req, _res, next) => next();
 
 app.use(helmet());
 app.use(cors({ origin: config.corsOrigin, credentials: true }));
 app.use(express.json({ limit: "10mb" }));
-app.use(apiLimiter);
-
-app.use("/api/auth/login", loginLimiter);
-app.use("/api/auth/register", registerLimiter);
+if (config.rateLimitingEnabled) {
+  app.use(apiLimiter);
+  app.use("/api/auth/login", loginLimiter);
+  app.use("/api/auth/register", registerLimiter);
+} else {
+  logger.warn("Rate limiting is DISABLED (RATE_LIMITING_ENABLED=false)");
+}
 app.use("/api/auth", authRoutes);
 app.use("/api/sso", ssoRoutes);
 app.use("/api/finance", financeRoutes);
@@ -104,7 +109,7 @@ app.use("/api/reporting", reportingRoutes);
 app.use("/api/workflow", workflowRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/learning", learningRoutes);
-app.use("/api/mrp", mrpLimiter, mrpRoutes);
+app.use("/api/mrp", config.rateLimitingEnabled ? mrpLimiter : noRateLimit, mrpRoutes);
 app.use("/api/scheduling", schedulingRoutes);
 app.use("/api/supply-chain", supplyChainRoutes);
 app.use("/api/process-mining", processMiningRoutes);
@@ -134,7 +139,7 @@ app.use("/api/integration", integrationRoutes);
 app.use("/api/documents", documentsRoutes);
 app.use("/api/courses", coursesRoutes);
 app.use("/api/certification", certificationRoutes);
-app.use("/api/dataset-generator", datasetLimiter, datasetGeneratorRoutes);
+app.use("/api/dataset-generator", config.rateLimitingEnabled ? datasetLimiter : noRateLimit, datasetGeneratorRoutes);
 app.use("/api/monitoring", monitoringRoutes);
 app.use("/api/process-flows", processFlowsRoutes);
 app.use("/api/digital-twin", digitalTwinRoutes);
@@ -154,7 +159,7 @@ app.use("/api/search", searchRoutes);
 app.use("/api/jobs", jobsRoutes);
 app.use("/api/learning-analytics", learningAnalyticsRoutes);
 app.use("/api/assignments", assignmentsRoutes);
-app.use("/api/data-export", exportLimiter, dataExportRoutes);
+app.use("/api/data-export", config.rateLimitingEnabled ? exportLimiter : noRateLimit, dataExportRoutes);
 app.use("/api/event-bus", eventBusRoutes);
 app.use("/api/copilot", copilotRoutes);
 app.use("/api/simulation", simulationRoutes);
